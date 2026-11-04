@@ -49,14 +49,16 @@ uint[] quadIndices =
 ];
 
 // The scene, in world units. The camera shows 2 units vertically, so y runs from -1 to 1 at the start.
-// Rectangles placed with the toolbar are added to the end.
-List<Rectangle> rectangles =
+// Bodies placed with the toolbar are added to the end.
+List<Body> bodies =
 [
-    new(Center: new(0f, -0.8f), Size: new(2.4f, 0.15f), Color: new(0.45f, 0.47f, 0.52f)), // platform the cloth falls onto
-    new(Center: new(0.5f, -0.6f), Size: new(0.3f, 0.25f), Color: new(0.9f, 0.55f, 0.2f)), // a custom box resting on it
+    new(position: new(0f, -0.8f), size: new(2.4f, 0.15f), color: new(0.45f, 0.47f, 0.52f), falls: false), // platform the cloth falls onto
+    new(position: new(0.5f, -0.6f), size: new(0.3f, 0.25f), color: new(0.9f, 0.55f, 0.2f), falls: false), // a custom box resting on it
 ];
 
-// Placed rectangles take the next color from this list, so neighbors are easy to tell apart.
+// Falling rectangles take the next color from this list, so neighbors are easy to tell apart.
+// Fixed ones are grey like the platform, so it's clear at a glance what will move.
+var fixedColor = new Vector3(0.45f, 0.47f, 0.52f);
 Vector3[] palette =
 [
     new(0.9f, 0.55f, 0.2f),  // orange
@@ -84,7 +86,10 @@ IMouse? mouse = null;
 
 var camera = new Camera2D(viewHeight: 2f);
 
+var physics = new Physics();
+
 var selectedTool = Tool.None;
+bool placeWithGravity = true; // the Rectangle tool's option: do placed rectangles fall?
 Vector2? dragStart = null; // world position where the current drag began, or null when not dragging
 int placedCount = 0;
 
@@ -99,6 +104,8 @@ window.Load += () =>
         {
             if (key == Key.Escape)
                 window.Close();
+            else if (key == Key.G)
+                placeWithGravity = !placeWithGravity;
         };
 
     mouse = input.Mice.FirstOrDefault();
@@ -115,11 +122,13 @@ window.Load += () =>
                 return;
 
             // Clicks on the panel pick a tool (clicking the selected one again deselects it)
-            // and never reach the scene.
+            // or flip the selected tool's option, and never reach the scene.
             if (Toolbar.Contains(m.Position))
             {
                 if (Toolbar.ToolAt(m.Position) is Tool tool)
                     selectedTool = selectedTool == tool ? Tool.None : tool;
+                else if (selectedTool == Tool.Rectangle && Toolbar.GravityToggleContains(m.Position))
+                    placeWithGravity = !placeWithGravity;
                 return;
             }
 
@@ -133,12 +142,14 @@ window.Load += () =>
                 return;
 
             dragStart = null;
-            var placed = Rectangle.FromCorners(start, MouseWorldPosition(), palette[placedCount % palette.Length]);
-            if (placed.Size.X >= MinPlacedSize && placed.Size.Y >= MinPlacedSize)
+            var color = placeWithGravity ? palette[placedCount % palette.Length] : fixedColor;
+            var area = Rectangle.FromCorners(start, MouseWorldPosition(), color);
+            if (area.Size.X >= MinPlacedSize && area.Size.Y >= MinPlacedSize)
             {
-                rectangles.Add(placed);
-                placedCount++;
-                Console.WriteLine($"Placed rectangle at ({placed.Center.X:F2}, {placed.Center.Y:F2}), size {placed.Size.X:F2} x {placed.Size.Y:F2}");
+                bodies.Add(new Body(area.Center, area.Size, color, placeWithGravity));
+                if (placeWithGravity)
+                    placedCount++;
+                Console.WriteLine($"Placed {(placeWithGravity ? "falling" : "fixed")} rectangle at ({area.Center.X:F2}, {area.Center.Y:F2}), size {area.Size.X:F2} x {area.Size.Y:F2}");
             }
         };
     }
@@ -189,6 +200,8 @@ var currentCursor = StandardCursor.Default;
 
 window.Update += deltaTime =>
 {
+    physics.Update(bodies, (float)deltaTime);
+
     // A crosshair over the scene shows that clicking will place something.
     if (mouse is not null)
     {
@@ -224,8 +237,8 @@ window.Render += _ =>
 
     // The scene, through the camera.
     SetMatrix(viewProjectionLocation, camera.ViewProjection);
-    foreach (var rectangle in rectangles)
-        DrawRectangle(rectangle);
+    foreach (var body in bodies)
+        DrawQuad(body.Model, body.Color);
 
     if (dragStart is Vector2 start)
         DrawRectangle(Rectangle.FromCorners(start, MouseWorldPosition(), previewColor));
@@ -243,6 +256,14 @@ window.Render += _ =>
         var button = Toolbar.Button(i, selected: tool == selectedTool, hovered: Toolbar.ToolAt(mousePosition) == tool);
         DrawRectangle(button);
         foreach (var part in Toolbar.Icon(tool, button))
+            DrawRectangle(part);
+    }
+
+    if (selectedTool == Tool.Rectangle)
+    {
+        var toggle = Toolbar.GravityToggle(placeWithGravity, hovered: Toolbar.GravityToggleContains(mousePosition));
+        DrawRectangle(toggle);
+        foreach (var part in Toolbar.GravityIcon(toggle, placeWithGravity))
             DrawRectangle(part);
     }
 };
@@ -271,13 +292,15 @@ Vector2 MouseWorldPosition()
 unsafe void SetMatrix(int location, Matrix4x4 matrix) =>
     gl.UniformMatrix4(location, 1, false, (float*)&matrix);
 
-// Same quad for every rectangle; only the model matrix and color change between draws.
-unsafe void DrawRectangle(Rectangle rectangle)
+// Same quad for everything drawn; only the model matrix and color change between draws.
+unsafe void DrawQuad(Matrix4x4 model, Vector3 color)
 {
-    gl.Uniform3(colorLocation, rectangle.Color);
-    SetMatrix(modelLocation, rectangle.Model);
+    gl.Uniform3(colorLocation, color);
+    SetMatrix(modelLocation, model);
     gl.DrawElements(PrimitiveType.Triangles, (uint)quadIndices.Length, DrawElementsType.UnsignedInt, (void*)0);
 }
+
+void DrawRectangle(Rectangle rectangle) => DrawQuad(rectangle.Model, rectangle.Color);
 
 static uint CreateShaderProgram(GL gl, string vertexSource, string fragmentSource)
 {

@@ -26,14 +26,15 @@ static class Toolbar
     public static Rectangle Panel(float windowHeight) =>
         new(Center: new(Width / 2f, windowHeight / 2f), Size: new(Width, windowHeight), PanelColor);
 
-    public static Rectangle Button(int index, bool selected, bool hovered)
-    {
-        float centerY = Padding + ButtonSize / 2f + index * (ButtonSize + Padding);
-        Vector3 color = selected ? new(0.30f, 0.45f, 0.75f)
-                      : hovered  ? new(0.28f, 0.29f, 0.35f)
-                      :            new(0.22f, 0.23f, 0.28f);
-        return new(Center: new(Width / 2f, centerY), Size: new(ButtonSize), color);
-    }
+    private static readonly Vector3 ButtonColor = new(0.22f, 0.23f, 0.28f);
+    private static readonly Vector3 HoveredColor = new(0.28f, 0.29f, 0.35f);
+
+    // The square at a position in the column of buttons, counting from the top.
+    private static Rectangle Slot(int index, Vector3 color) =>
+        new(Center: new(Width / 2f, Padding + ButtonSize / 2f + index * (ButtonSize + Padding)), Size: new(ButtonSize), color);
+
+    public static Rectangle Button(int index, bool selected, bool hovered) =>
+        Slot(index, selected ? new(0.30f, 0.45f, 0.75f) : hovered ? HoveredColor : ButtonColor);
 
     // The tool whose button is under the point, or null if the point isn't on a button.
     public static Tool? ToolAt(Vector2 point)
@@ -42,6 +43,24 @@ static class Toolbar
             if (Button(i, false, false).Contains(point))
                 return Tools[i];
         return null;
+    }
+
+    // The gravity option, shown in the slot below the tools while the Rectangle tool is selected.
+    // On (green): placed rectangles fall. Off: they stay where they're placed.
+    public static Rectangle GravityToggle(bool on, bool hovered) =>
+        Slot(Tools.Length, on ? new(0.25f, 0.55f, 0.35f) : hovered ? HoveredColor : ButtonColor);
+
+    public static bool GravityToggleContains(Vector2 point) => GravityToggle(false, false).Contains(point);
+
+    // A downward arrow: a stem, then a head made of bars that narrow toward the tip.
+    public static IEnumerable<Rectangle> GravityIcon(Rectangle button, bool on)
+    {
+        Vector3 color = on ? new(0.92f, 0.95f, 0.92f) : new(0.45f, 0.47f, 0.52f);
+        var c = button.Center; // y points down in window pixels
+        yield return new(new(c.X, c.Y - 6f), new(6f, 16f), color);
+        yield return new(new(c.X, c.Y + 4f), new(18f, 4f), color);
+        yield return new(new(c.X, c.Y + 8f), new(12f, 4f), color);
+        yield return new(new(c.X, c.Y + 12f), new(6f, 4f), color);
     }
 
     // What to draw on top of a tool's button. Icons are built from rectangles, so no textures are needed yet.

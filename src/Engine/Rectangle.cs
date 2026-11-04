@@ -1,8 +1,9 @@
 using System.Numerics;
 
 /// <summary>
-/// An axis-aligned rectangle in world units, described by its center and full size.
-/// It doesn't move: the cloth will use <see cref="Min"/> and <see cref="Max"/> to collide with it.
+/// An axis-aligned rectangle described by its center and full size, used for the toolbar (in window
+/// pixels) and the drag preview (in world units). Things in the scene are <see cref="Body"/>s instead,
+/// because they can move and rotate.
 /// Every rectangle is drawn with the same unit quad (-0.5..0.5); <see cref="Model"/> stretches
 /// that quad to <see cref="Size"/> and moves it to <see cref="Center"/>.
 /// </summary>

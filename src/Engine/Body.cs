@@ -1,0 +1,47 @@
+using System.Numerics;
+
+/// <summary>
+/// A solid box in the scene, in world units. A fixed body never moves; a falling body is moved by
+/// <see cref="Physics"/>: gravity pulls it down, and contacts with other bodies push it and spin it,
+/// so it can tip over edges and roll off corners.
+/// Bodies are drawn with the same unit quad as everything else; <see cref="Model"/> stretches it to
+/// <see cref="Size"/>, turns it by <see cref="Angle"/> and moves it to <see cref="Position"/>.
+/// </summary>
+sealed class Body
+{
+    public Vector2 Position;       // center
+    public float Angle;            // radians, counter-clockwise
+    public Vector2 Velocity;       // world units per second
+    public float AngularVelocity;  // radians per second, counter-clockwise
+    public readonly Vector2 Size;
+    public readonly Vector3 Color;
+
+    // The solver works with inverses: 0 means "infinitely heavy", which is exactly a fixed body.
+    public readonly float InverseMass;
+    public readonly float InverseInertia; // resistance to spinning: how hard it is to change AngularVelocity
+
+    public Body(Vector2 position, Vector2 size, Vector3 color, bool falls, float density = 1f)
+    {
+        Position = position;
+        Size = size;
+        Color = color;
+
+        if (falls)
+        {
+            float mass = density * size.X * size.Y;
+            InverseMass = 1f / mass;
+            // Moment of inertia of a solid rectangle about its center: m (w² + h²) / 12.
+            InverseInertia = 12f / (mass * (size.X * size.X + size.Y * size.Y));
+        }
+    }
+
+    public bool Falls => InverseMass > 0f;
+
+    // The box's local x and y directions in world space.
+    public Vector2 AxisX => new(MathF.Cos(Angle), MathF.Sin(Angle));
+    public Vector2 AxisY => new(-MathF.Sin(Angle), MathF.Cos(Angle));
+
+    // Row-vector order: scale the unit quad, rotate it, then move it into place.
+    public Matrix4x4 Model =>
+        Matrix4x4.CreateScale(Size.X, Size.Y, 1f) * Matrix4x4.CreateRotationZ(Angle) * Matrix4x4.CreateTranslation(Position.X, Position.Y, 0f);
+}
