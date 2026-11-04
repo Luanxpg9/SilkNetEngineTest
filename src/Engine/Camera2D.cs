@@ -20,4 +20,12 @@ sealed class Camera2D(float viewHeight)
 
     // System.Numerics uses row vectors, so transforms compose left to right: view first, then projection.
     public Matrix4x4 ViewProjection => View * Projection;
+
+    // Window pixels (origin top left, y down) -> world units (y up). The inverse of ViewProjection
+    // followed by the viewport, worked out by hand because an orthographic camera makes it simple.
+    public Vector2 ScreenToWorld(Vector2 screen, Vector2 screenSize)
+    {
+        var ndc = new Vector2(screen.X / screenSize.X * 2f - 1f, 1f - screen.Y / screenSize.Y * 2f);
+        return Position + ndc * new Vector2(ViewHeight * AspectRatio, ViewHeight) / 2f;
+    }
 }
