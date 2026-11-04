@@ -1,3 +1,4 @@
+using System.Numerics;
 using Silk.NET.Input;
 using Silk.NET.Maths;
 using Silk.NET.OpenGL;
@@ -8,12 +9,14 @@ const string vertexShaderSource = """
     layout (location = 0) in vec3 aPosition;
     layout (location = 1) in vec3 aColor;
 
+    uniform mat4 uViewProjection;
+
     out vec3 vColor;
 
     void main()
     {
         vColor = aColor;
-        gl_Position = vec4(aPosition, 1.0);
+        gl_Position = uViewProjection * vec4(aPosition, 1.0);
     }
     """;
 
@@ -29,7 +32,9 @@ const string fragmentShaderSource = """
     }
     """;
 
-// Each vertex: position (x, y, z) followed by color (r, g, b).
+const float CameraSpeed = 1.5f; // world units per second
+
+// Each vertex: position (x, y, z) in world units followed by color (r, g, b).
 float[] vertices =
 [
     //  x      y     z      r     g     b
@@ -48,14 +53,20 @@ var options = WindowOptions.Default with
 var window = Window.Create(options);
 GL gl = null!;
 uint vao = 0, vbo = 0, shaderProgram = 0;
+int viewProjectionLocation = -1;
+IKeyboard? keyboard = null;
+
+// 2 world units tall, so the triangle (1 unit across) fills about half the window's height.
+var camera = new Camera2D(viewHeight: 2f);
 
 window.Load += () =>
 {
     gl = window.CreateOpenGL();
 
     var input = window.CreateInput();
-    foreach (var keyboard in input.Keyboards)
-        keyboard.KeyDown += (_, key, _) =>
+    keyboard = input.Keyboards.FirstOrDefault();
+    foreach (var kb in input.Keyboards)
+        kb.KeyDown += (_, key, _) =>
         {
             if (key == Key.Escape)
                 window.Close();
@@ -86,9 +97,35 @@ window.Load += () =>
     gl.BindVertexArray(0);
 
     shaderProgram = CreateShaderProgram(gl, vertexShaderSource, fragmentShaderSource);
+    viewProjectionLocation = gl.GetUniformLocation(shaderProgram, "uViewProjection");
+
+    var size = window.FramebufferSize;
+    camera.AspectRatio = (float)size.X / size.Y;
 };
 
-window.FramebufferResize += size => gl.Viewport(size);
+window.FramebufferResize += size =>
+{
+    gl.Viewport(size);
+    if (size.Y > 0) // minimizing reports a 0 height
+        camera.AspectRatio = (float)size.X / size.Y;
+};
+
+window.Update += deltaTime =>
+{
+    if (keyboard is null)
+        return;
+
+    // WASD or arrow keys pan the camera along X and Y.
+    Vector2 direction = Vector2.Zero;
+    if (keyboard.IsKeyPressed(Key.A) || keyboard.IsKeyPressed(Key.Left))  direction.X -= 1;
+    if (keyboard.IsKeyPressed(Key.D) || keyboard.IsKeyPressed(Key.Right)) direction.X += 1;
+    if (keyboard.IsKeyPressed(Key.S) || keyboard.IsKeyPressed(Key.Down))  direction.Y -= 1;
+    if (keyboard.IsKeyPressed(Key.W) || keyboard.IsKeyPressed(Key.Up))    direction.Y += 1;
+
+    // Normalize so diagonal movement isn't faster than straight movement.
+    if (direction != Vector2.Zero)
+        camera.Position += Vector2.Normalize(direction) * CameraSpeed * (float)deltaTime;
+};
 
 window.Render += _ =>
 {
@@ -96,6 +133,16 @@ window.Render += _ =>
     gl.Clear(ClearBufferMask.ColorBufferBit);
 
     gl.UseProgram(shaderProgram);
+
+    // System.Numerics stores matrices row-major and GLSL reads column-major. That implicit
+    // transpose is exactly what turns its row-vector math into GLSL's `matrix * vector`,
+    // so no transpose flag is needed.
+    var viewProjection = camera.ViewProjection;
+    unsafe
+    {
+        gl.UniformMatrix4(viewProjectionLocation, 1, false, (float*)&viewProjection);
+    }
+
     gl.BindVertexArray(vao);
     gl.DrawArrays(PrimitiveType.Triangles, 0, 3);
 };
