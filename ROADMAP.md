@@ -40,12 +40,52 @@ The first game on the engine, using only what Phase A provides.
 
 **Done when:** you can walk the square around and aim it with the mouse.
 
+### 2.5. Fixes from the engine review
+Small fixes from the silk-engine agent's review of v0.2.0, done before step 3 so the batcher builds on them.
+- [ ] Move the rigid-body physics (`Body`, `Physics`, `Collision`) from Engine to Sandbox: the shooter won't use it, and step 5 brings the engine's own collision
+- [ ] A "pressed" check that is safe in `FixedUpdate`: a press is seen by exactly one fixed step, even when a frame runs 0 or 2 of them (needed before bullets)
+- [ ] A `Color` type with red, green, blue and alpha (transparency), ready-made colors like `Color.White`, and creation from hex codes like `#2B2D35`; it replaces the `Vector3` colors everywhere
+- [ ] `Rectangle` renamed to `Rect` and holding only position and size (no color); this also ends the clash with Silk.NET's `Rectangle`
+- [ ] Draw calls take shape and color separately: `Draw(rect, color)`
+
+**Decided, no change needed:** a shader that fails to compile throws and stops the game, which is the intended behavior. Sandbox's physics micro-stutter on fast screens and devices plugged in after startup are left for later refinement.
+
 ### 3. Sprite rendering
-- [ ] Load textures from PNG (StbImageSharp)
-- [ ] Sprite batcher: many textured quads in one draw call, with position, size, rotation, origin and tint
-- [ ] Sprite sheets (sub-rectangles of a texture) and frame animation
-- [ ] Draw order (layers) and alpha blending
-- [ ] Player, enemies and bullets drawn as sprites (placeholder art is fine)
+
+#### Phase A: textures and the sprite batcher
+The rendering core: many textured quads per draw call, replacing one draw call per quad.
+- [ ] GPU error reporting: in Debug builds, ask the driver to report OpenGL errors through a debug callback (`KHR_debug`) and send them to `Log`
+- [ ] `Texture`: load PNGs (StbImageSharp), flipped for OpenGL, with nearest or linear filtering, `IDisposable`
+- [ ] Assets folder in each game, copied next to the built game
+- [ ] Alpha blending, set up so transparent edges don't get dark fringes
+- [ ] `SpriteBatch`: corners computed on the CPU from position, size, rotation, origin and tint, written into a buffer that is refilled every frame and drawn in one call
+- [ ] Start a new batch when the texture changes or the buffer is full
+- [ ] A 1×1 white texture, so flat-colored rectangles are tinted sprites and `SpriteBatch` can replace `QuadRenderer`
+- [ ] Move the shooter and Sandbox onto `SpriteBatch`, then remove `QuadRenderer`. The toolbar draws its icons straight into the batch instead of returning lists of rectangles, so it no longer creates objects every frame
+- [ ] Draw call count available for checking (logged or queryable)
+
+**Done when:** both apps look exactly as before, the shooter's arena takes one draw call instead of about 600, and the shooter shows one textured sprite.
+
+#### Phase B: sprite sheets and art
+Built on Phase A; mostly bookkeeping on top of the batcher, plus the game's first real art.
+
+**Art direction:** smooth, detailed art, not pixel art. Sprites are drawn at high resolution and scaled down with linear filtering and mipmaps, so fine detail survives at any zoom. All art is made for this project (no assets with unclear licenses), kept as editable source files next to the exported PNGs. Claude drafts the art as SVG files (editable in Inkscape) and a script exports them to PNG.
+
+**The soldier and the rifle:**
+- **Rifle:** M16A4, classic black furniture. From above: flat-top upper with a Picatinny rail, red dot sight on the upper rail, rail handguard, laser aiming module on the handguard rail, front sight post, A2 birdcage flash hider, charging handle, fixed buttstock.
+- **Hold:** shouldered, aiming straight ahead with both hands.
+- **Soldier:** modern kit: helmet, plate carrier, gloves.
+
+- [ ] Sprite sheet regions: draw a sub-rectangle of a texture
+- [ ] Frame animation: a sequence of regions with a frame duration
+- [ ] Draw order with layers (e.g. floor, bodies, weapon, effects)
+- [ ] **The player: a soldier seen from above, holding an M16A4** (see above). The rifle is the star, so it gets real detail
+- [ ] The rifle as its own layer on top of the soldier, so it can later recoil and show a muzzle flash
+- [ ] **Visible laser beam** from the laser module toward the aim point: a thin, semi-transparent red line with a brighter dot at the end, drawn on the effects layer. It helps the player aim. For now it ends at the mouse; once walls exist (steps 5 and 6) it should stop at the first wall it hits
+- [ ] Walk animation for the soldier
+- [ ] First-pass sprites for an enemy and a bullet, in the same style
+
+**Done when:** the soldier walks with an animation, aims the M16 at the mouse with the laser beam showing where it points, and the rifle's details are readable in game.
 
 ### 4. Entities
 - [ ] Plain C# game objects with `Update` / `Draw`, owned by a scene (no ECS for now)
