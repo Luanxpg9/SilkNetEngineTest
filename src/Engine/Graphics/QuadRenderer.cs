@@ -10,7 +10,7 @@ namespace Engine;
 /// the sprite batcher in roadmap step 3 replaces this for big scenes.
 ///
 /// Usage per frame: <see cref="Begin"/>, then <see cref="SetViewProjection"/> for a pass
-/// (camera for the scene, pixels for the UI), then any number of <see cref="Draw(Matrix4x4, Vector3)"/>.
+/// (camera for the scene, pixels for the UI), then any number of <see cref="Draw(Matrix4x4, Color)"/>.
 /// </summary>
 public sealed class QuadRenderer : IDisposable
 {
@@ -29,13 +29,13 @@ public sealed class QuadRenderer : IDisposable
 
     private const string FragmentShaderSource = """
         #version 330 core
-        uniform vec3 uColor;
+        uniform vec4 uColor;
 
         out vec4 FragColor;
 
         void main()
         {
-            FragColor = vec4(uColor, 1.0);
+            FragColor = uColor;
         }
         """;
 
@@ -105,14 +105,14 @@ public sealed class QuadRenderer : IDisposable
     // or a pixel projection for the UI.
     public void SetViewProjection(Matrix4x4 viewProjection) => SetMatrix(_viewProjectionLocation, viewProjection);
 
-    public unsafe void Draw(Matrix4x4 model, Vector3 color)
+    public unsafe void Draw(Matrix4x4 model, Color color)
     {
-        _gl.Uniform3(_colorLocation, color);
+        _gl.Uniform4(_colorLocation, color.ToVector4());
         SetMatrix(_modelLocation, model);
         _gl.DrawElements(PrimitiveType.Triangles, (uint)QuadIndices.Length, DrawElementsType.UnsignedInt, (void*)0);
     }
 
-    public void Draw(Rectangle rectangle) => Draw(rectangle.Model, rectangle.Color);
+    public void Draw(Rect rect, Color color) => Draw(rect.Model, color);
 
     // System.Numerics stores matrices row-major and GLSL reads column-major. That implicit
     // transpose is exactly what turns its row-vector math into GLSL's `matrix * vector`,

@@ -1,4 +1,5 @@
 using System.Numerics;
+using Engine;
 
 /// <summary>
 /// The player: a square that moves with WASD and turns to face the mouse.
@@ -12,8 +13,8 @@ sealed class Player(Vector2 position)
 {
     public const float Speed = 5f;     // world units per second
     public const float Size = 0.8f;    // world units, side of the square
-    public static readonly Vector3 BodyColor = new(0.35f, 0.75f, 0.45f);
-    public static readonly Vector3 NoseColor = new(0.92f, 0.95f, 0.92f);
+    public static readonly Color BodyColor = Color.FromHex("#59BF73");
+    public static readonly Color NoseColor = Color.FromHex("#EBF2EB");
 
     public Vector2 Position = position;          // center, after the latest fixed step
     public Vector2 PreviousPosition = position;  // center, after the step before it

@@ -9,8 +9,8 @@ You are a .NET and Silk.NET graphics engineer working in HavingFunWithEngine, a 
 ## The project
 
 - `ROADMAP.md` at the root is the scope: steps from the engine split to a playable top-down shooter, each with a checklist. Identify the current step, don't jump ahead unless asked, and tick boxes when work lands.
-- `src/Engine`: class library, namespace `Engine` (folders `Graphics/`, `Physics/`). Must stay generic: nothing game-specific goes here.
-- `src/Sandbox`: physics playground app (toolbar, placing boxes) that references Engine.
+- `src/Engine`: class library, namespace `Engine` (folders `Graphics/`, `Input/`). Must stay generic: nothing game-specific goes here.
+- `src/Sandbox`: physics playground app (toolbar, placing boxes) that references Engine. It owns the rigid-body physics (`Physics/`: `Body`, `Physics`, `Collision`), which moved out of the engine in step 2.5.
 - `src/TopDownShooter`: the game, created in roadmap step 2; game-specific code lives here.
 - `src/Circles`: a side experiment with instanced circles / sphere impostors and a uniform collision grid. Standalone, not on the roadmap.
 - Stack: .NET 9, C# 13, `Nullable` and `ImplicitUsings` on, `AllowUnsafeBlocks` on. Packages: `Silk.NET.OpenGL`, `Silk.NET.Windowing`, `Silk.NET.Input` 2.23.0, referenced by Engine and inherited by apps that reference it (Circles references them directly). Keep every project on the same Silk.NET version.
@@ -21,7 +21,7 @@ You are a .NET and Silk.NET graphics engineer working in HavingFunWithEngine, a 
 Match it; don't impose a different architecture.
 
 - Apps derive from `Engine.Game` (one class per app, e.g. `SandboxGame.cs`) and override `Load` / `FixedUpdate` / `Update` / `Draw` / `Resized` / `Unload`; `Program.cs` is just `new XGame().Run();`. Input goes through `Game.Input` (`IsDown` / `WasPressed` / `WasReleased`), never raw Silk.NET events. One-off presses belong in `Update`, simulation in `FixedUpdate`. `src/Circles` still uses the older top-level-statements style with window lambdas.
-- Engine types are `public` with file-scoped `namespace Engine;`; implementation details (like `Collision`, `Contact`) are `internal`. `Silk.NET.Maths.Rectangle` clashes with `Engine.Rectangle`, so a file importing both aliases it.
+- Engine types are `public` with file-scoped `namespace Engine;`; implementation details are `internal`. Shapes and colors are separate: `Rect` (center, size) and `Color` (RGBA floats, `Color.FromHex`), drawn as `Quads.Draw(rect, color)`. `Input.WasPressed` is safe in both `Update` and `FixedUpdate`.
 - GLSL lives in C# raw string literals (`"""`) beginning `#version 330 core`, with explicit `layout (location = N)` on attributes.
 - Comments explain *why* a GL step is needed (what a VAO records, why shaders can be deleted after linking), in plain language, because the repo is a learning log. Keep that density: short, explanatory, no boilerplate XML docs.
 - `unsafe` blocks stay small and are used only where Silk.NET needs pointers (e.g. `VertexAttribPointer` offsets). Prefer Silk.NET's span/generic overloads (`BufferData<float>(…, ReadOnlySpan<T>)`) over raw pointers when one exists.

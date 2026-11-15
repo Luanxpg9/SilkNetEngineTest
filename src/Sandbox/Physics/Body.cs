@@ -1,6 +1,5 @@
 using System.Numerics;
-
-namespace Engine;
+using Engine;
 
 /// <summary>
 /// A solid box in the scene, in world units. A fixed body never moves; a falling body is moved by
@@ -9,20 +8,20 @@ namespace Engine;
 /// Bodies are drawn with the same unit quad as everything else; <see cref="Model"/> stretches it to
 /// <see cref="Size"/>, turns it by <see cref="Angle"/> and moves it to <see cref="Position"/>.
 /// </summary>
-public sealed class Body
+sealed class Body
 {
     public Vector2 Position;       // center
     public float Angle;            // radians, counter-clockwise
     public Vector2 Velocity;       // world units per second
     public float AngularVelocity;  // radians per second, counter-clockwise
     public readonly Vector2 Size;
-    public readonly Vector3 Color;
+    public readonly Color Color;
 
     // The solver works with inverses: 0 means "infinitely heavy", which is exactly a fixed body.
     public readonly float InverseMass;
     public readonly float InverseInertia; // resistance to spinning: how hard it is to change AngularVelocity
 
-    public Body(Vector2 position, Vector2 size, Vector3 color, bool falls, float density = 1f)
+    public Body(Vector2 position, Vector2 size, Color color, bool falls, float density = 1f)
     {
         Position = position;
         Size = size;
