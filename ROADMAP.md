@@ -8,8 +8,8 @@ The engine stays generic: nothing specific to the shooter goes into `src/Engine`
 
 | Project | Role |
 | --- | --- |
-| `src/Engine` | Class library: window and game loop, 2D rendering, input, camera, collision and physics, assets. |
-| `src/Sandbox` | The physics playground (toolbar, drag to place boxes, falling rigid bodies). First app built on the engine. |
+| `src/Engine` | Class library: window and game loop, 2D rendering, input, camera, collision, assets. |
+| `src/Sandbox` | The physics playground (toolbar, drag to place boxes, falling rigid bodies), with its own rigid-body physics. First app built on the engine. |
 | `src/TopDownShooter` | The game. Created in step 2 phase B and grows with every step. |
 | `src/Circles` | Side experiment: instanced circles and sphere impostors. Not part of the roadmap. |
 
@@ -42,11 +42,12 @@ The first game on the engine, using only what Phase A provides.
 
 ### 2.5. Fixes from the engine review
 Small fixes from the silk-engine agent's review of v0.2.0, done before step 3 so the batcher builds on them.
-- [ ] Move the rigid-body physics (`Body`, `Physics`, `Collision`) from Engine to Sandbox: the shooter won't use it, and step 5 brings the engine's own collision
-- [ ] A "pressed" check that is safe in `FixedUpdate`: a press is seen by exactly one fixed step, even when a frame runs 0 or 2 of them (needed before bullets)
-- [ ] A `Color` type with red, green, blue and alpha (transparency), ready-made colors like `Color.White`, and creation from hex codes like `#2B2D35`; it replaces the `Vector3` colors everywhere
-- [ ] `Rectangle` renamed to `Rect` and holding only position and size (no color); this also ends the clash with Silk.NET's `Rectangle`
-- [ ] Draw calls take shape and color separately: `Draw(rect, color)`
+- [x] Move the rigid-body physics (`Body`, `Physics`, `Collision`) from Engine to Sandbox: the shooter won't use it, and step 5 brings the engine's own collision
+- [x] A "pressed" check that is safe in `FixedUpdate`: a press is seen by exactly one fixed step, even when a frame runs 0 or 2 of them (needed before bullets)
+- [x] A `Color` type with red, green, blue and alpha (transparency), ready-made colors like `Color.White`, and creation from hex codes like `#2B2D35`; it replaces the `Vector3` colors everywhere
+- [x] `Rectangle` renamed to `Rect` and holding only position and size (no color); this also ends the clash with Silk.NET's `Rectangle`
+- [x] Draw calls take shape and color separately: `Draw(rect, color)`
+- [x] (Brought forward from step 3 Phase A) The toolbar draws straight into the renderer instead of returning lists of rectangles, so it no longer creates objects every frame
 
 **Decided, no change needed:** a shader that fails to compile throws and stops the game, which is the intended behavior. Sandbox's physics micro-stutter on fast screens and devices plugged in after startup are left for later refinement.
 
@@ -61,7 +62,7 @@ The rendering core: many textured quads per draw call, replacing one draw call p
 - [ ] `SpriteBatch`: corners computed on the CPU from position, size, rotation, origin and tint, written into a buffer that is refilled every frame and drawn in one call
 - [ ] Start a new batch when the texture changes or the buffer is full
 - [ ] A 1×1 white texture, so flat-colored rectangles are tinted sprites and `SpriteBatch` can replace `QuadRenderer`
-- [ ] Move the shooter and Sandbox onto `SpriteBatch`, then remove `QuadRenderer`. The toolbar draws its icons straight into the batch instead of returning lists of rectangles, so it no longer creates objects every frame
+- [ ] Move the shooter and Sandbox onto `SpriteBatch`, then remove `QuadRenderer` (the toolbar already draws straight into the renderer since step 2.5, so it just switches to the batch)
 - [ ] Draw call count available for checking (logged or queryable)
 
 **Done when:** both apps look exactly as before, the shooter's arena takes one draw call instead of about 600, and the shooter shows one textured sprite.

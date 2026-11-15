@@ -11,9 +11,9 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
     // The arena is a grid of 1x1 tiles centered on the origin, with a wall around it.
     private const int ArenaWidth = 30, ArenaHeight = 20; // tiles
     private const float WallThickness = 0.5f;
-    private static readonly Vector3 TileColorA = new(0.16f, 0.17f, 0.21f);
-    private static readonly Vector3 TileColorB = new(0.19f, 0.20f, 0.25f);
-    private static readonly Vector3 WallColor = new(0.45f, 0.47f, 0.52f);
+    private static readonly Color TileColorA = Color.FromHex("#292B36");
+    private static readonly Color TileColorB = Color.FromHex("#303340");
+    private static readonly Color WallColor = Color.FromHex("#737885");
     private static readonly Vector2 ArenaHalfSize = new(ArenaWidth / 2f, ArenaHeight / 2f);
 
     // Shows 12 world units vertically: room to see what's coming, with the player still large on screen.
@@ -25,7 +25,8 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
     // Simulation: movement belongs here, so it's identical at any frame rate.
     protected override void FixedUpdate(float step)
     {
-        // Held keys (IsDown) are safe in the fixed step; one-off presses are handled in Update.
+        // Held keys (IsDown) drive movement. WasPressed works here too (each press reaches exactly one
+        // fixed step), which is what firing will use; Esc stays in Update because quitting isn't simulation.
         Vector2 direction = Vector2.Zero;
         if (Input.IsDown(Key.A) || Input.IsDown(Key.Left))  direction.X -= 1;
         if (Input.IsDown(Key.D) || Input.IsDown(Key.Right)) direction.X += 1;
@@ -73,15 +74,15 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
             for (int y = 0; y < ArenaHeight; y++)
             {
                 var center = new Vector2(x + 0.5f, y + 0.5f) - ArenaHalfSize;
-                Quads.Draw(new Rectangle(center, Vector2.One, (x + y) % 2 == 0 ? TileColorA : TileColorB));
+                Quads.Draw(new Rect(center, Vector2.One), (x + y) % 2 == 0 ? TileColorA : TileColorB);
             }
 
         var outer = ArenaHalfSize * 2f + new Vector2(WallThickness * 2f);
         float wallY = ArenaHalfSize.Y + WallThickness / 2f;
         float wallX = ArenaHalfSize.X + WallThickness / 2f;
-        Quads.Draw(new Rectangle(new(0f, wallY), new(outer.X, WallThickness), WallColor));   // top
-        Quads.Draw(new Rectangle(new(0f, -wallY), new(outer.X, WallThickness), WallColor));  // bottom
-        Quads.Draw(new Rectangle(new(-wallX, 0f), new(WallThickness, outer.Y), WallColor));  // left
-        Quads.Draw(new Rectangle(new(wallX, 0f), new(WallThickness, outer.Y), WallColor));   // right
+        Quads.Draw(new Rect(new(0f, wallY), new(outer.X, WallThickness)), WallColor);   // top
+        Quads.Draw(new Rect(new(0f, -wallY), new(outer.X, WallThickness)), WallColor);  // bottom
+        Quads.Draw(new Rect(new(-wallX, 0f), new(WallThickness, outer.Y)), WallColor);  // left
+        Quads.Draw(new Rect(new(wallX, 0f), new(WallThickness, outer.Y)), WallColor);   // right
     }
 }

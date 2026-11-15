@@ -4,7 +4,8 @@ using Silk.NET.Input;
 
 /// <summary>
 /// The physics playground: a toolbar for placing falling and fixed rectangles, and a camera that
-/// pans with WASD. The engine's <see cref="Game"/> runs the window and the loop.
+/// pans with WASD. The engine's <see cref="Game"/> runs the window and the loop; the rigid-body
+/// physics (<see cref="Physics"/>, <see cref="Body"/>) belongs to Sandbox.
 /// </summary>
 sealed class SandboxGame() : Game("HavingFunWithEngine - Sandbox")
 {
@@ -13,11 +14,11 @@ sealed class SandboxGame() : Game("HavingFunWithEngine - Sandbox")
 
     // Falling rectangles take the next color from this list, so neighbors are easy to tell apart.
     // Fixed ones are grey like the platform, so it's clear at a glance what will move.
-    private static readonly Vector3 FixedColor = new(0.45f, 0.47f, 0.52f);
-    private static readonly Vector3 PreviewColor = new(0.4f, 0.7f, 1f);
-    private static readonly Vector3[] Palette =
+    private static readonly Color FixedColor = new(0.45f, 0.47f, 0.52f);
+    private static readonly Color PreviewColor = new(0.4f, 0.7f, 1f);
+    private static readonly Color[] Palette =
     [
-        new(0.9f, 0.55f, 0.2f),  // orange
+        new(0.9f, 0.55f, 0.2f),   // orange
         new(0.35f, 0.75f, 0.45f), // green
         new(0.85f, 0.35f, 0.4f),  // red
         new(0.75f, 0.6f, 0.9f),   // lilac
@@ -28,8 +29,8 @@ sealed class SandboxGame() : Game("HavingFunWithEngine - Sandbox")
     // Bodies placed with the toolbar are added to the end.
     private readonly List<Body> _bodies =
     [
-        new(position: new(0f, -0.8f), size: new(2.4f, 0.15f), color: FixedColor, falls: false),               // a platform
-        new(position: new(0.5f, -0.6f), size: new(0.3f, 0.25f), color: new(0.9f, 0.55f, 0.2f), falls: false), // a custom box resting on it
+        new(position: new(0f, -0.8f), size: new(2.4f, 0.15f), color: FixedColor, falls: false),        // a platform
+        new(position: new(0.5f, -0.6f), size: new(0.3f, 0.25f), color: Palette[0], falls: false),      // a custom box resting on it
     ];
 
     private readonly Camera2D _camera = new(viewHeight: 2f);
@@ -99,10 +100,10 @@ sealed class SandboxGame() : Game("HavingFunWithEngine - Sandbox")
         if (Input.WasReleased(MouseButton.Left) && _dragStart is Vector2 start)
         {
             _dragStart = null;
-            var color = _placeWithGravity ? Palette[_placedCount % Palette.Length] : FixedColor;
-            var area = Rectangle.FromCorners(start, Input.MouseWorldPosition(_camera), color);
+            var area = Rect.FromCorners(start, Input.MouseWorldPosition(_camera));
             if (area.Size.X >= MinPlacedSize && area.Size.Y >= MinPlacedSize)
             {
+                var color = _placeWithGravity ? Palette[_placedCount % Palette.Length] : FixedColor;
                 _bodies.Add(new Body(area.Center, area.Size, color, _placeWithGravity));
                 if (_placeWithGravity)
                     _placedCount++;
@@ -121,28 +122,10 @@ sealed class SandboxGame() : Game("HavingFunWithEngine - Sandbox")
             Quads.Draw(body.Model, body.Color);
 
         if (_dragStart is Vector2 start)
-            Quads.Draw(Rectangle.FromCorners(start, Input.MouseWorldPosition(_camera), PreviewColor));
+            Quads.Draw(Rect.FromCorners(start, Input.MouseWorldPosition(_camera)), PreviewColor);
 
         // The UI, drawn last so it sits on top, in window units so the camera doesn't move it.
         Quads.SetViewProjection(ScreenProjection);
-
-        var mouse = Input.MousePosition;
-        Quads.Draw(Toolbar.Panel(WindowSize.Y));
-        for (int i = 0; i < Toolbar.Tools.Length; i++)
-        {
-            var tool = Toolbar.Tools[i];
-            var button = Toolbar.Button(i, selected: tool == _selectedTool, hovered: Toolbar.ToolAt(mouse) == tool);
-            Quads.Draw(button);
-            foreach (var part in Toolbar.Icon(tool, button))
-                Quads.Draw(part);
-        }
-
-        if (_selectedTool == Tool.Rectangle)
-        {
-            var toggle = Toolbar.GravityToggle(_placeWithGravity, hovered: Toolbar.GravityToggleContains(mouse));
-            Quads.Draw(toggle);
-            foreach (var part in Toolbar.GravityIcon(toggle, _placeWithGravity))
-                Quads.Draw(part);
-        }
+        Toolbar.Draw(Quads, WindowSize.Y, Input.MousePosition, _selectedTool, _placeWithGravity);
     }
 }

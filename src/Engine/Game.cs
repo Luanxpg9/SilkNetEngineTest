@@ -22,9 +22,10 @@ namespace Engine;
 /// </list>
 ///
 /// Which update to use: <see cref="FixedUpdate"/> for simulation that must not depend on frame rate
-/// (movement with collisions, timers, AI), <see cref="Update"/> for things that should follow the
-/// screen smoothly (camera, UI) and for one-off input like <see cref="Engine.Input.WasPressed(Key)"/>.
-/// A fixed step can be skipped or doubled up in a frame, so a press seen there could be missed.
+/// (movement with collisions, timers, AI, firing), <see cref="Update"/> for things that should follow
+/// the screen smoothly (camera, UI). <see cref="Engine.Input.WasPressed(Key)"/> works in both: inside
+/// <see cref="FixedUpdate"/> each press is seen by exactly one fixed step, even when a frame runs
+/// 0 or 2 of them.
 /// </summary>
 public abstract class Game
 {
@@ -66,7 +67,7 @@ public abstract class Game
     /// </summary>
     public float FixedStepAlpha => (float)(_accumulator / FixedTimeStep);
 
-    public Vector3 ClearColor { get; set; } = new(0.1f, 0.1f, 0.15f);
+    public Color ClearColor { get; set; } = new(0.1f, 0.1f, 0.15f);
 
     /// <summary>Window size in window units, the space mouse positions are in.</summary>
     public Vector2 WindowSize => new(_window.Size.X, _window.Size.Y);
@@ -133,7 +134,10 @@ public abstract class Game
         int steps = 0;
         while (_accumulator >= FixedTimeStep && steps < MaxFixedStepsPerFrame)
         {
+            // Between Begin and End, Input answers "since the last fixed step" instead of "since the last frame".
+            Input.BeginFixedStep();
             FixedUpdate(FixedTimeStep);
+            Input.EndFixedStep();
             _accumulator -= FixedTimeStep;
             steps++;
         }
@@ -145,7 +149,7 @@ public abstract class Game
 
     private void OnRender(double deltaTime)
     {
-        GL.ClearColor(ClearColor.X, ClearColor.Y, ClearColor.Z, 1f);
+        GL.ClearColor(ClearColor.R, ClearColor.G, ClearColor.B, ClearColor.A);
         GL.Clear(ClearBufferMask.ColorBufferBit);
         Draw();
     }

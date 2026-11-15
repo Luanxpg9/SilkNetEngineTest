@@ -1,13 +1,11 @@
 using System.Numerics;
 
-namespace Engine;
-
 /// <summary>
 /// One point where two bodies touch. <see cref="Normal"/> points from <see cref="A"/> to
 /// <see cref="B"/>, and <see cref="Depth"/> is how far they overlap along it. The remaining fields
 /// belong to the solver in <see cref="Physics"/>.
 /// </summary>
-internal struct Contact
+struct Contact
 {
     public Body A, B;
     public Vector2 Point, Normal;
@@ -33,7 +31,7 @@ internal struct Contact
 /// Two contacts for a box lying flat is what lets it rest without rocking. One contact off to the
 /// side of the center is what makes it tip.
 /// </summary>
-internal static class Collision
+static class Collision
 {
     public static void BoxBox(Body a, Body b, List<Contact> contacts)
     {
