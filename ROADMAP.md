@@ -10,7 +10,7 @@ The engine stays generic: nothing specific to the shooter goes into `src/Engine`
 | --- | --- |
 | `src/Engine` | Class library: window and game loop, 2D rendering, input, camera, collision and physics, assets. |
 | `src/Sandbox` | The physics playground (toolbar, drag to place boxes, falling rigid bodies). First app built on the engine. |
-| `src/TopDownShooter` | The game. Created in step 2 and grows with every step. |
+| `src/TopDownShooter` | The game. Created in step 2 phase B and grows with every step. |
 | `src/Circles` | Side experiment: instanced circles and sphere impostors. Not part of the roadmap. |
 
 ## Steps
@@ -24,19 +24,19 @@ The engine stays generic: nothing specific to the shooter goes into `src/Engine`
 
 #### Phase A: engine side
 The engine takes over the window and the loop, so apps stop wiring Silk.NET events by hand.
-- [ ] `Game` base class that owns the window and GL context, with overridable `Load` / `Update` / `Draw` / `Unload`
-- [ ] Fixed time step for game logic, separate from rendering
-- [ ] Input state: key and mouse button pressed / held / released this frame, mouse position in window and world coordinates
-- [ ] Move Sandbox onto `Game`, behaving exactly as before
+- [x] `Game` base class that owns the window and GL context, with overridable `Load` / `Update` / `Draw` / `Unload`
+- [x] Fixed time step for game logic, separate from rendering (`FixedUpdate`)
+- [x] Input state: key and mouse button pressed / held / released this frame, mouse position in window and world coordinates
+- [x] Move Sandbox onto `Game`, behaving exactly as before
 
 **Done when:** Sandbox runs on `Game` with no Silk.NET window or input code left in its `Program.cs`.
 
 #### Phase B: the shooter starts
 The first game on the engine, using only what Phase A provides.
-- [ ] Create `src/TopDownShooter` and add it to the solution
-- [ ] A square player that moves with WASD, at the same speed diagonally
-- [ ] The player turns to face the mouse
-- [ ] The camera follows the player
+- [x] Create `src/TopDownShooter` and add it to the solution
+- [x] A square player that moves with WASD, at the same speed diagonally
+- [x] The player turns to face the mouse
+- [x] The camera follows the player
 
 **Done when:** you can walk the square around and aim it with the mouse.
 

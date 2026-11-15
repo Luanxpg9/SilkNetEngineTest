@@ -15,7 +15,7 @@ A toolbar on the left edge lets you place more rectangles:
 1. Click the **Rectangle** button (the orange icon). It turns blue to show it's selected, and the cursor becomes a crosshair over the scene.
 2. A **gravity** toggle (a down arrow) appears below it. It starts on (green): placed rectangles fall. Click it, or press `G`, to switch it off (grey) and place fixed rectangles instead, such as more platforms.
 3. Click and drag in the scene. A blue preview shows the rectangle as you drag, in any direction.
-4. Release to place it, and its position and size are printed to the console.
+4. Release to place it, and its position and size are logged to the console.
    - **Falling rectangles** take the next color from a small palette. They're rigid bodies: they fall, rotate, tip over edges, topple off corners, stack, and are removed if they fall off the world.
    - **Fixed rectangles** are grey like the platform and stay where they're placed.
 
@@ -33,20 +33,20 @@ Right click during a drag cancels it. Click the selected button again to deselec
 | Right click | Cancel the current drag |
 | `Esc` | Quit |
 
-On startup it prints the OpenGL version and GPU in use.
+On startup it logs the OpenGL version and GPU in use. To hide these messages, set `Log.Level` in `Program.cs` (see the engine README).
 
 ## How it works
 
-The window, input and frame loop are in [`Program.cs`](Program.cs), and the toolbar layout is in [`Toolbar.cs`](Toolbar.cs). The camera, quad rendering and physics come from the engine; its [README](../Engine/README.md) explains how they work.
+[`SandboxGame.cs`](SandboxGame.cs) is the scene and its tools, a `Game` from the engine, and the toolbar layout is in [`Toolbar.cs`](Toolbar.cs). [`Program.cs`](Program.cs) is one line: `new SandboxGame().Run();`. The window, loop, input, camera, quad rendering and physics come from the engine; its [README](../Engine/README.md) explains how they work.
 
-1. **Window and context.** Silk.NET creates a 1280×720 window with an OpenGL 3.3 core profile context. The engine's `QuadRenderer` is created in `window.Load`, because the context only exists once the window is running, and disposed in `window.Closing`.
-2. **Update.** Each tick, `Physics.Update` advances the bodies first. Then WASD or the arrow keys move the camera at a constant 1.5 units per second, scaled by delta time so it doesn't depend on frame rate, with the direction normalized so diagonals aren't faster.
-3. **Drawing.** Each frame: clear, `quads.Begin()`, then two passes with the same quads:
+1. **Resize.** `Resized` keeps the camera's aspect ratio in step with the window.
+2. **Update.** Sandbox only uses `Update`, not `FixedUpdate`: physics keeps its own 1/240 s fixed step and is fed the real frame time, and the camera should follow the screen smoothly. Each frame, `Physics.Update` advances the bodies first. Then `Esc` and `G` are checked with `Input.WasPressed`, the mouse is handled (below), and WASD or the arrow keys (`Input.IsDown`) move the camera at a constant 1.5 units per second, scaled by delta time, with the direction normalized so diagonals aren't faster.
+3. **Drawing.** `Draw` calls `Quads.Begin()`, then two passes with the same quads:
    - **Scene pass:** the camera's `ViewProjection`. Draw every body, then the drag preview if a drag is in progress.
-   - **UI pass:** `CreateOrthographicOffCenter(0, width, height, 0)`, which maps window pixels straight to the screen with (0, 0) at the top left. The toolbar panel, buttons and icons are drawn in pixels, so the camera doesn't move them, and last, so they sit on top of the scene.
-4. **Toolbar and mouse.** `Toolbar` is pure layout in window pixels: the panel, one button per tool, hit testing (`ToolAt`) and icons built from small rectangles, so there's no texture or text rendering yet. The mouse handlers in `Program.cs` do the rest:
+   - **UI pass:** the engine's `ScreenProjection`, which maps window units straight to the screen with (0, 0) at the top left. The toolbar panel, buttons and icons are drawn in those units, so the camera doesn't move them, and last, so they sit on top of the scene.
+4. **Toolbar and mouse.** `Toolbar` is pure layout in window pixels: the panel, one button per tool, hit testing (`ToolAt`) and icons built from small rectangles, so there's no texture or text rendering yet. `HandleMouse` in `SandboxGame.cs` does the rest, using `Input.WasPressed` / `WasReleased` for the buttons and `Input.Cursor` for the crosshair:
    - A left click on the panel selects or deselects a tool, or flips the gravity option while the Rectangle tool is selected. Panel clicks never reach the scene.
-   - A left click in the scene with the Rectangle tool stores the drag's start in **world** units, using `Camera2D.ScreenToWorld`. Each frame, the preview spans from that start to the mouse's current world position, so panning the camera mid-drag keeps the start pinned to the world.
+   - A left click in the scene with the Rectangle tool stores the drag's start in **world** units, using `Input.MouseWorldPosition(camera)`. Each frame, the preview spans from that start to the mouse's current world position, so panning the camera mid-drag keeps the start pinned to the world.
    - Releasing measures the dragged area with `Rectangle.FromCorners`, which accepts the two corners in any order, and adds a `Body` there that falls or not, depending on the gravity option.
 
 ## Ideas for later
