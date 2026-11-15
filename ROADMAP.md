@@ -21,11 +21,24 @@ The engine stays generic: nothing specific to the shooter goes into `src/Engine`
 - [x] Update the solution, READMEs and this roadmap
 
 ### 2. Game loop and input
+
+#### Phase A: engine side
+The engine takes over the window and the loop, so apps stop wiring Silk.NET events by hand.
 - [ ] `Game` base class that owns the window and GL context, with overridable `Load` / `Update` / `Draw` / `Unload`
 - [ ] Fixed time step for game logic, separate from rendering
 - [ ] Input state: key and mouse button pressed / held / released this frame, mouse position in window and world coordinates
-- [ ] Move Sandbox onto `Game`
-- [ ] Create `src/TopDownShooter`: a square player that moves with WASD and faces the mouse
+- [ ] Move Sandbox onto `Game`, behaving exactly as before
+
+**Done when:** Sandbox runs on `Game` with no Silk.NET window or input code left in its `Program.cs`.
+
+#### Phase B: the shooter starts
+The first game on the engine, using only what Phase A provides.
+- [ ] Create `src/TopDownShooter` and add it to the solution
+- [ ] A square player that moves with WASD, at the same speed diagonally
+- [ ] The player turns to face the mouse
+- [ ] The camera follows the player
+
+**Done when:** you can walk the square around and aim it with the mouse.
 
 ### 3. Sprite rendering
 - [ ] Load textures from PNG (StbImageSharp)
