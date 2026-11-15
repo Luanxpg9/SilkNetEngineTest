@@ -24,10 +24,10 @@ The engine stays generic: nothing specific to the shooter goes into `src/Engine`
 
 #### Phase A: engine side
 The engine takes over the window and the loop, so apps stop wiring Silk.NET events by hand.
-- [ ] `Game` base class that owns the window and GL context, with overridable `Load` / `Update` / `Draw` / `Unload`
-- [ ] Fixed time step for game logic, separate from rendering
-- [ ] Input state: key and mouse button pressed / held / released this frame, mouse position in window and world coordinates
-- [ ] Move Sandbox onto `Game`, behaving exactly as before
+- [x] `Game` base class that owns the window and GL context, with overridable `Load` / `Update` / `Draw` / `Unload`
+- [x] Fixed time step for game logic, separate from rendering (`FixedUpdate`)
+- [x] Input state: key and mouse button pressed / held / released this frame, mouse position in window and world coordinates
+- [x] Move Sandbox onto `Game`, behaving exactly as before
 
 **Done when:** Sandbox runs on `Game` with no Silk.NET window or input code left in its `Program.cs`.
 

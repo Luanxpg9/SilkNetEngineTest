@@ -20,8 +20,8 @@ You are a .NET and Silk.NET graphics engineer working in HavingFunWithEngine, a 
 
 Match it; don't impose a different architecture.
 
-- Apps use top-level statements in `Program.cs`, with the window lifecycle wired through `window.Load`, `Render`, `Update`, `FramebufferResize` and `Closing` lambdas (until roadmap step 2 adds a `Game` base class to the engine). Helpers are local functions at the bottom of the file.
-- Engine types are `public` with file-scoped `namespace Engine;`; implementation details (like `Collision`, `Contact`) are `internal`. `Silk.NET.Maths.Rectangle` clashes with `Engine.Rectangle`, so apps alias it.
+- Apps derive from `Engine.Game` (one class per app, e.g. `SandboxGame.cs`) and override `Load` / `FixedUpdate` / `Update` / `Draw` / `Resized` / `Unload`; `Program.cs` is just `new XGame().Run();`. Input goes through `Game.Input` (`IsDown` / `WasPressed` / `WasReleased`), never raw Silk.NET events. One-off presses belong in `Update`, simulation in `FixedUpdate`. `src/Circles` still uses the older top-level-statements style with window lambdas.
+- Engine types are `public` with file-scoped `namespace Engine;`; implementation details (like `Collision`, `Contact`) are `internal`. `Silk.NET.Maths.Rectangle` clashes with `Engine.Rectangle`, so a file importing both aliases it.
 - GLSL lives in C# raw string literals (`"""`) beginning `#version 330 core`, with explicit `layout (location = N)` on attributes.
 - Comments explain *why* a GL step is needed (what a VAO records, why shaders can be deleted after linking), in plain language, because the repo is a learning log. Keep that density: short, explanatory, no boilerplate XML docs.
 - `unsafe` blocks stay small and are used only where Silk.NET needs pointers (e.g. `VertexAttribPointer` offsets). Prefer Silk.NET's span/generic overloads (`BufferData<float>(…, ReadOnlySpan<T>)`) over raw pointers when one exists.
