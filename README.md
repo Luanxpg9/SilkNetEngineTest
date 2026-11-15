@@ -1,10 +1,11 @@
 # HavingFunWithEngine
 
-Learning real-time rendering from scratch in C# with [Silk.NET](https://github.com/dotnet/Silk.NET) and OpenGL 3.3 core. No engine, no framework, just the graphics API.
+A small 2D game engine built from scratch in C# with [Silk.NET](https://github.com/dotnet/Silk.NET) and OpenGL 3.3 core. No engine, no framework, just the graphics API. The first game made with it will be a top-down shooter.
 
 | Project | What it is |
 | --- | --- |
-| [`src/Engine`](src/Engine) | The main render engine, built step by step following [LearnOpenGL](https://learnopengl.com/). Currently draws its first triangle. |
+| [`src/Engine`](src/Engine) | The engine, a class library: 2D camera, quad rendering, shader helpers and rigid-body physics so far. |
+| [`src/Sandbox`](src/Sandbox) | A physics playground built on the engine: place falling and fixed boxes with a toolbar and watch them tip, topple and stack. |
 | [`src/Circles`](src/Circles) | A side experiment: thousands of circles and sphere impostors drawn with one instanced draw call, with ball-to-ball collisions. |
 
 ## Requirements
@@ -15,17 +16,12 @@ Learning real-time rendering from scratch in C# with [Silk.NET](https://github.c
 ## Running
 
 ```bash
-dotnet run --project src/Engine
+dotnet run --project src/Sandbox
 dotnet run --project src/Circles
 ```
 
-## Roadmap (Engine)
+The engine is a library, so it doesn't run on its own.
 
-The scope is kept small on purpose, with a clear finish line after step 4.
+## Roadmap
 
-1. ~~Window, first triangle, shader program~~
-2. Textures, camera (view/projection), transforms
-3. Model loading (Assimp) and Blinn-Phong lighting
-4. Shadow mapping, skybox, a simple scene graph
-
-Maybe later: normal mapping, PBR, deferred shading.
+See [ROADMAP.md](ROADMAP.md): the steps from here to a playable top-down shooter, with a checklist for each.

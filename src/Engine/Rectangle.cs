@@ -1,5 +1,7 @@
 using System.Numerics;
 
+namespace Engine;
+
 /// <summary>
 /// An axis-aligned rectangle described by its center and full size, used for the toolbar (in window
 /// pixels) and the drag preview (in world units). Things in the scene are <see cref="Body"/>s instead,
@@ -7,7 +9,7 @@ using System.Numerics;
 /// Every rectangle is drawn with the same unit quad (-0.5..0.5); <see cref="Model"/> stretches
 /// that quad to <see cref="Size"/> and moves it to <see cref="Center"/>.
 /// </summary>
-readonly record struct Rectangle(Vector2 Center, Vector2 Size, Vector3 Color)
+public readonly record struct Rectangle(Vector2 Center, Vector2 Size, Vector3 Color)
 {
     public Vector2 Min => Center - Size / 2f;
     public Vector2 Max => Center + Size / 2f;

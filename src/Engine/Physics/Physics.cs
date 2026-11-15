@@ -1,6 +1,8 @@
 using System.Numerics;
 using System.Runtime.InteropServices;
 
+namespace Engine;
+
 /// <summary>
 /// Rigid-body physics for the scene's boxes: gravity, collisions with rotation, and friction.
 /// Fixed bodies never move but still block falling ones, and falling bodies can land on, tip off
@@ -18,7 +20,7 @@ using System.Runtime.InteropServices;
 /// The simulation runs in fixed steps, independent of frame rate, which also keeps fast-falling
 /// bodies from skipping through thin platforms.
 /// </summary>
-sealed class Physics
+public sealed class Physics
 {
     public static readonly Vector2 Gravity = new(0f, -9.81f); // world units per second squared; one unit is one meter
     private const float TimeStep = 1f / 240f;    // seconds per simulation step

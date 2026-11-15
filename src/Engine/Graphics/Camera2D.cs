@@ -1,12 +1,14 @@
 using System.Numerics;
 
+namespace Engine;
+
 /// <summary>
 /// An orthographic camera that looks straight down the -Z axis at the XY plane.
 /// <see cref="Position"/> is the world point at the center of the screen, and
 /// <see cref="ViewHeight"/> is how many world units fit vertically. The visible width
 /// follows from the window's aspect ratio, so shapes keep their proportions.
 /// </summary>
-sealed class Camera2D(float viewHeight)
+public sealed class Camera2D(float viewHeight)
 {
     public Vector2 Position;
     public float ViewHeight = viewHeight;
