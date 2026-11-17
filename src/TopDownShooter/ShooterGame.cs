@@ -40,6 +40,9 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
     // Simulation: movement belongs here, so it's identical at any frame rate.
     protected override void FixedUpdate(float step)
     {
+        // Remember where this step starts, before anything moves the player (see Player.DrawPosition).
+        _player.BeginFixedStep();
+
         // Held keys (IsDown) drive movement. WasPressed works here too (each press reaches exactly one
         // fixed step), which is what firing will use; Esc stays in Update because quitting isn't simulation.
         Vector2 direction = Vector2.Zero;

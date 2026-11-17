@@ -196,6 +196,12 @@ public sealed class SpriteBatch : IDisposable
         // which is the correct "over" operation for premultiplied colors (see Texture).
         _gl.Enable(EnableCap.Blend);
         _gl.BlendFunc(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
+
+        // Sprites are flat and drawn in layer order, so these must be off. Face culling would hide
+        // quads whose corners come out clockwise: everything under ScreenProjection (y down), and
+        // sprites mirrored with a negative size. A depth test would drop sprites drawn at the same depth.
+        _gl.Disable(EnableCap.CullFace);
+        _gl.Disable(EnableCap.DepthTest);
     }
 
     /// <summary>Sorts the pass's sprites by layer, draws them, and ends the pass.</summary>
@@ -206,7 +212,10 @@ public sealed class SpriteBatch : IDisposable
         _begun = false;
 
         if (_spriteCount == 0)
+        {
+            _gl.BindVertexArray(0);
             return;
+        }
 
         // Sort sprite indices by key. Each key holds the layer in its high 32 bits and the call
         // number in its low 32 bits, so sorting by key orders by layer first and keeps call order
@@ -237,6 +246,11 @@ public sealed class SpriteBatch : IDisposable
         // Let go of the textures, so a texture disposed later isn't kept alive by this array.
         Array.Clear(_textures, 0, _spriteCount);
         _spriteCount = 0;
+
+        // Unbind the VAO. It records which index buffer is bound, so while it stays bound, any later
+        // BindBuffer(ElementArrayBuffer, ...) elsewhere (a new engine class creating its buffers)
+        // would silently replace the batch's indices and the next pass would draw garbage.
+        _gl.BindVertexArray(0);
     }
 
     /// <summary>
@@ -261,7 +275,8 @@ public sealed class SpriteBatch : IDisposable
         float bottom = -o.Y * size.Y, top = bottom + size.Y;
 
         // Turn each corner by the rotation, then move it to the position. Same as a model matrix
-        // (scale, rotate, translate), done here so the GPU gets finished positions.
+        // (scale, rotate, translate), done here so the GPU gets finished positions. It's
+        // MathHelpers.Rotate written out, so cos and sin are computed once for all 4 corners.
         float cos = MathF.Cos(rotation), sin = MathF.Sin(rotation);
         Vector2 Corner(float x, float y) => position + new Vector2(x * cos - y * sin, x * sin + y * cos);
 

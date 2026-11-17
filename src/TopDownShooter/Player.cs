@@ -42,11 +42,20 @@ sealed class Player(Vector2 position)
     private float _walkTime; // seconds into the walk animation; runs backwards when walking backwards
     private float _legsAngle;
 
+    /// <summary>
+    /// Call at the start of every fixed step, before anything moves the player: remembers where
+    /// the step starts, for <see cref="DrawPosition"/>. Kept apart from <see cref="Move"/> so
+    /// anything else that moves the player in the step (the wall clamp now, collisions later) is
+    /// part of the same blend.
+    /// </summary>
+    public void BeginFixedStep() => PreviousPosition = Position;
+
+    /// <summary>Moves the player instantly, with no blending from the old spot (a respawn, say).</summary>
+    public void Teleport(Vector2 to) => Position = PreviousPosition = to;
+
     /// <summary>One fixed step of movement. <paramref name="direction"/> doesn't need to be normalized.</summary>
     public void Move(Vector2 direction, float step)
     {
-        PreviousPosition = Position;
-
         // Normalize so diagonal movement isn't faster than straight movement.
         if (direction != Vector2.Zero)
             Position += Vector2.Normalize(direction) * Speed * step;
@@ -84,7 +93,7 @@ sealed class Player(Vector2 position)
         if (moved.LengthSquared() > 1e-10f)
         {
             float walkAngle = MathF.Atan2(moved.Y, moved.X);
-            bool backwards = MathF.Abs(WrapAngle(walkAngle - Angle)) > MathF.PI / 2f;
+            bool backwards = MathF.Abs(MathHelpers.WrapAngle(walkAngle - Angle)) > MathF.PI / 2f;
             targetAngle = backwards ? walkAngle + MathF.PI : walkAngle;
             _walkTime += backwards ? -deltaTime : deltaTime;
         }
@@ -93,8 +102,9 @@ sealed class Player(Vector2 position)
             _walkTime = 0f; // frame 0 is the standing pose
         }
 
-        // Swing toward the target by a fraction each frame: fast at first, easing in at the end.
-        _legsAngle += WrapAngle(targetAngle - _legsAngle) * MathF.Min(1f, LegsTurnRate * deltaTime);
+        // Swing toward the target by a fraction each frame: fast at first, easing in at the end,
+        // with the same curve at any frame rate.
+        _legsAngle += MathHelpers.WrapAngle(targetAngle - _legsAngle) * MathHelpers.SmoothingFactor(LegsTurnRate, deltaTime);
     }
 
     public void Draw(SpriteBatch sprites, Art art, Vector2 at, Vector2 aimPoint)
@@ -108,7 +118,7 @@ sealed class Player(Vector2 position)
         sprites.Draw(art.SoldierBase, at, bodySize, Color.White, Angle, bodyOrigin, Layers.Bodies);
 
         // The rifle turns around its butt, which is placed at the shoulder, turned with the body.
-        var rifleAt = at + Art.Rotate(RifleOffset, Angle);
+        var rifleAt = at + MathHelpers.Rotate(RifleOffset, Angle);
         sprites.Draw(art.Rifle, rifleAt, Art.WorldSize(art.Rifle), Color.White, Angle,
             Art.Origin(art.Rifle, RifleButtPixel.X, RifleButtPixel.Y), Layers.Weapons);
 
@@ -121,8 +131,8 @@ sealed class Player(Vector2 position)
     // it lands. When the aim point is closer than the laser itself (mouse over the rifle), there's no beam.
     private void DrawLaser(SpriteBatch sprites, Art art, Vector2 at, Vector2 aimPoint)
     {
-        var laserAt = at + Art.Rotate(LaserOffset, Angle);
-        var facing = new Vector2(MathF.Cos(Angle), MathF.Sin(Angle));
+        var laserAt = at + MathHelpers.Rotate(LaserOffset, Angle);
+        var facing = MathHelpers.FromAngle(Angle);
         if (Vector2.Dot(aimPoint - laserAt, facing) <= 0f)
             return;
 
@@ -130,7 +140,4 @@ sealed class Player(Vector2 position)
         sprites.DrawLine(laserAt, aimPoint, BeamCoreWidth, BeamCoreColor, Layers.Effects);
         sprites.Draw(art.LaserDot, aimPoint, new Vector2(LaserDotSize), Color.White, layer: Layers.Effects);
     }
-
-    // An angle brought into -π..π, so differences between angles take the short way round.
-    private static float WrapAngle(float angle) => MathF.IEEERemainder(angle, MathF.Tau);
 }

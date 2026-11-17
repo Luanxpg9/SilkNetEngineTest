@@ -67,14 +67,15 @@ sealed class Art : IDisposable
     public static Vector2 Offset(float x, float y, float anchorX, float anchorY) =>
         new((x - anchorX) / PixelsPerUnit, -(y - anchorY) / PixelsPerUnit);
 
-    /// <summary>A pixel of a texture as a <see cref="SpriteBatch"/> origin (0..1, from the bottom left).</summary>
-    public static Vector2 Origin(Texture texture, float x, float y) => new(x / texture.Width, 1f - y / texture.Height);
-
-    /// <summary>Turns a local offset (art facing +X) by <paramref name="angle"/>, so it follows a sprite drawn at that angle.</summary>
-    public static Vector2 Rotate(Vector2 offset, float angle)
+    /// <summary>
+    /// A pixel of a region (or a whole texture) as a <see cref="SpriteBatch"/> origin: 0..1 from the
+    /// bottom left. The pixel is counted from the region's own top-left corner, so it works the same
+    /// for one frame of a sheet as for a whole image.
+    /// </summary>
+    public static Vector2 Origin(TextureRegion region, float x, float y)
     {
-        float cos = MathF.Cos(angle), sin = MathF.Sin(angle);
-        return new Vector2(offset.X * cos - offset.Y * sin, offset.X * sin + offset.Y * cos);
+        var size = region.PixelSize;
+        return new Vector2(x / size.X, 1f - y / size.Y);
     }
 
     public void Dispose()
