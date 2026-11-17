@@ -55,15 +55,15 @@ Small fixes from the silk-engine agent's review of v0.2.0, done before step 3 so
 
 #### Phase A: textures and the sprite batcher
 The rendering core: many textured quads per draw call, replacing one draw call per quad.
-- [ ] GPU error reporting: in Debug builds, ask the driver to report OpenGL errors through a debug callback (`KHR_debug`) and send them to `Log`
-- [ ] `Texture`: load PNGs (StbImageSharp), flipped for OpenGL, with nearest or linear filtering, `IDisposable`
-- [ ] Assets folder in each game, copied next to the built game
-- [ ] Alpha blending, set up so transparent edges don't get dark fringes
-- [ ] `SpriteBatch`: corners computed on the CPU from position, size, rotation, origin and tint, written into a buffer that is refilled every frame and drawn in one call
-- [ ] Start a new batch when the texture changes or the buffer is full
-- [ ] A 1×1 white texture, so flat-colored rectangles are tinted sprites and `SpriteBatch` can replace `QuadRenderer`
-- [ ] Move the shooter and Sandbox onto `SpriteBatch`, then remove `QuadRenderer` (the toolbar already draws straight into the renderer since step 2.5, so it just switches to the batch)
-- [ ] Draw call count available for checking (logged or queryable)
+- [x] GPU error reporting: in Debug builds, ask the driver to report OpenGL errors through a debug callback (`KHR_debug`) and send them to `Log`
+- [x] `Texture`: load PNGs (StbImageSharp), flipped for OpenGL, with nearest or linear filtering, `IDisposable`
+- [x] Assets folder in each game, copied next to the built game
+- [x] Alpha blending, set up so transparent edges don't get dark fringes
+- [x] `SpriteBatch`: corners computed on the CPU from position, size, rotation, origin and tint, written into a buffer that is refilled every frame and drawn in one call
+- [x] Start a new batch when the texture changes or the buffer is full
+- [x] A 1×1 white texture, so flat-colored rectangles are tinted sprites and `SpriteBatch` can replace `QuadRenderer`
+- [x] Move the shooter and Sandbox onto `SpriteBatch`, then remove `QuadRenderer` (the toolbar already draws straight into the renderer since step 2.5, so it just switches to the batch)
+- [x] Draw call count available for checking (logged or queryable)
 
 **Done when:** both apps look exactly as before, the shooter's arena takes one draw call instead of about 600, and the shooter shows one textured sprite.
 

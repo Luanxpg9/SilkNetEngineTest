@@ -21,11 +21,11 @@ You are a .NET and Silk.NET graphics engineer working in HavingFunWithEngine, a 
 Match it; don't impose a different architecture.
 
 - Apps derive from `Engine.Game` (one class per app, e.g. `SandboxGame.cs`) and override `Load` / `FixedUpdate` / `Update` / `Draw` / `Resized` / `Unload`; `Program.cs` is just `new XGame().Run();`. Input goes through `Game.Input` (`IsDown` / `WasPressed` / `WasReleased`), never raw Silk.NET events. One-off presses belong in `Update`, simulation in `FixedUpdate`. `src/Circles` still uses the older top-level-statements style with window lambdas.
-- Engine types are `public` with file-scoped `namespace Engine;`; implementation details are `internal`. Shapes and colors are separate: `Rect` (center, size) and `Color` (RGBA floats, `Color.FromHex`), drawn as `Quads.Draw(rect, color)`. `Input.WasPressed` is safe in both `Update` and `FixedUpdate`.
+- Engine types are `public` with file-scoped `namespace Engine;`; implementation details are `internal`. Shapes and colors are separate: `Rect` (center, size) and `Color` (RGBA floats, `Color.FromHex`), drawn with the `SpriteBatch` as `Sprites.Draw(rect, color, rotation)` or `Sprites.Draw(texture, position, size, tint)` between `Sprites.Begin(viewProjection)` and `Sprites.End()`. Textures use premultiplied alpha (`Texture.Load` premultiplies; blending is `One, OneMinusSrcAlpha`). Game images live in each game's `Assets/` folder, copied to the output. `Input.WasPressed` is safe in both `Update` and `FixedUpdate`.
 - GLSL lives in C# raw string literals (`"""`) beginning `#version 330 core`, with explicit `layout (location = N)` on attributes.
 - Comments explain *why* a GL step is needed (what a VAO records, why shaders can be deleted after linking), in plain language, because the repo is a learning log. Keep that density: short, explanatory, no boilerplate XML docs.
 - `unsafe` blocks stay small and are used only where Silk.NET needs pointers (e.g. `VertexAttribPointer` offsets). Prefer Silk.NET's span/generic overloads (`BufferData<float>(…, ReadOnlySpan<T>)`) over raw pointers when one exists.
-- Every GL object created in `Load` is deleted in `Closing`, then `gl.Dispose()`. Engine classes that own GL objects (like `QuadRenderer`) are `IDisposable`.
+- Every GL object created in `Load` is deleted in `Closing`, then `gl.Dispose()`. Engine classes that own GL objects (like `SpriteBatch`, `Texture`) are `IDisposable`.
 - Only introduce classes (e.g. `Texture`, `SpriteBatch`, `Game`) when the roadmap step calls for them, and keep them small.
 
 ## Silk.NET / OpenGL knowledge to apply
@@ -34,10 +34,10 @@ Match it; don't impose a different architecture.
 - Silk.NET enum names carry suffixes from the GL spec (`BufferTargetARB`, `BufferUsageARB`, `ProgramPropertyARB`, `ShaderParameterName`, `GLEnum`). When an overload won't resolve, check the enum type before reaching for casts.
 - `GL.GetStringS`, `GetShaderInfoLog`, `GetProgramInfoLog` return managed strings; always check compile and link status and throw with the info log.
 - Matrices: `System.Numerics.Matrix4x4` is row-major with row vectors, so upload with `transpose: false` and multiply as `model * view * projection` in C#, or `projection * view * model` in GLSL with column vectors. Say which convention you use when you introduce one.
-- Textures: stb-style image loading via `StbImageSharp` (add only when the textures step arrives), flip vertically for GL, set `UnpackAlignment` to 1 for non-4-byte rows, generate mipmaps.
+- Textures: `StbImageSharp` loads images (in `Texture.Load`), flipped vertically for GL; set `UnpackAlignment` to 1 for non-4-byte rows. Mipmaps arrive with step 3 Phase B.
 - Audio: `Silk.NET.OpenAL` (same 2.23.0 version) when roadmap step 8 arrives; keep buffers and sources `IDisposable`.
 - Window resize: use `FramebufferResize` (framebuffer pixels), not `Resize` (window units), for `glViewport`, since they differ on high-DPI displays.
-- Debugging: on GL 4.3+ drivers `KHR_debug` / `glDebugMessageCallback` is available even under a 3.3 context on most desktop GPUs; prefer it over sprinkling `GetError`. Hold a reference to the callback delegate so the GC can't collect it.
+- Debugging: on GL 4.3+ drivers `KHR_debug` / `glDebugMessageCallback` is available even under a 3.3 context on most desktop GPUs; prefer it over sprinkling `GetError`. `GLDebug` already does this in Debug builds and logs through `Log`; watch the console for its messages when testing.
 - Performance: avoid per-frame allocations in `Render`/`Update` (no LINQ, closures or `new` arrays there); reuse buffers with `BufferSubData` or orphaning; batch with instancing as `src/Circles` does. Use `Span<T>`, `stackalloc` and `CollectionsMarshal.AsSpan` where it keeps hot paths allocation-free.
 
 ## How you work

@@ -5,8 +5,8 @@ using Engine;
 /// A solid box in the scene, in world units. A fixed body never moves; a falling body is moved by
 /// <see cref="Physics"/>: gravity pulls it down, and contacts with other bodies push it and spin it,
 /// so it can tip over edges and roll off corners.
-/// Bodies are drawn with the same unit quad as everything else; <see cref="Model"/> stretches it to
-/// <see cref="Size"/>, turns it by <see cref="Angle"/> and moves it to <see cref="Position"/>.
+/// Bodies are drawn as flat sprites: a <see cref="Rect"/> at <see cref="Position"/> with <see cref="Size"/>,
+/// turned by <see cref="Angle"/>.
 /// </summary>
 sealed class Body
 {
@@ -41,8 +41,4 @@ sealed class Body
     // The box's local x and y directions in world space.
     public Vector2 AxisX => new(MathF.Cos(Angle), MathF.Sin(Angle));
     public Vector2 AxisY => new(-MathF.Sin(Angle), MathF.Cos(Angle));
-
-    // Row-vector order: scale the unit quad, rotate it, then move it into place.
-    public Matrix4x4 Model =>
-        Matrix4x4.CreateScale(Size.X, Size.Y, 1f) * Matrix4x4.CreateRotationZ(Angle) * Matrix4x4.CreateTranslation(Position.X, Position.Y, 0f);
 }
