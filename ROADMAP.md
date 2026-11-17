@@ -77,14 +77,14 @@ Built on Phase A; mostly bookkeeping on top of the batcher, plus the game's firs
 - **Hold:** shouldered, aiming straight ahead with both hands.
 - **Soldier:** modern kit: helmet, plate carrier, gloves.
 
-- [ ] Sprite sheet regions: draw a sub-rectangle of a texture
-- [ ] Frame animation: a sequence of regions with a frame duration
-- [ ] Draw order with layers (e.g. floor, bodies, weapon, effects)
-- [ ] **The player: a soldier seen from above, holding an M16A4** (see above). The rifle is the star, so it gets real detail
-- [ ] The rifle as its own layer on top of the soldier, so it can later recoil and show a muzzle flash
-- [ ] **Visible laser beam** from the laser module toward the aim point: a thin, semi-transparent red line with a brighter dot at the end, drawn on the effects layer. It helps the player aim. For now it ends at the mouse; once walls exist (steps 5 and 6) it should stop at the first wall it hits
-- [ ] Walk animation for the soldier
-- [ ] First-pass sprites for an enemy and a bullet, in the same style
+- [x] Sprite sheet regions: draw a sub-rectangle of a texture
+- [x] Frame animation: a sequence of regions with a frame duration
+- [x] Draw order with layers (e.g. floor, bodies, weapon, effects)
+- [x] **The player: a soldier seen from above, holding an M16A4** (see above). The rifle is the star, so it gets real detail
+- [x] The rifle as its own layer on top of the soldier, so it can later recoil and show a muzzle flash
+- [x] **Visible laser beam** from the laser module toward the aim point: a thin, semi-transparent red line with a brighter dot at the end, drawn on the effects layer. It helps the player aim. For now it ends at the mouse; step 5 changes it to stop at a maximum range or at the first body it hits
+- [x] Walk animation for the soldier
+- [x] First-pass sprites for an enemy and a bullet, in the same style
 
 **Done when:** the soldier walks with an animation, aims the M16 at the mouse with the laser beam showing where it points, and the rifle's details are readable in game.
 
@@ -99,11 +99,14 @@ Built on Phase A; mostly bookkeeping on top of the batcher, plus the game's firs
 - [ ] Collision layers and masks (player, enemy, bullet, wall)
 - [ ] Solid collisions (push out, slide along walls) vs. triggers (overlap events only)
 - [ ] A broad phase (uniform grid, like `src/Circles`) so hundreds of bullets stay cheap
+- [ ] Raycasts: cast a ray from a point in a direction, up to a maximum distance, and get the first shape it hits (which shape, where, how far), filtered by collision layers
 - [ ] Shooter: bullets hit enemies, enemies touch the player, nobody walks through walls
+- [ ] Shooter: the laser no longer ends at the mouse. It's a raycast from the laser module along the rifle, and the beam and its dot stop at the first body it hits (enemy, wall, crate) or at the laser's maximum range, whichever comes first
 
 ### 6. Tilemap levels
 - [ ] Grid of tiles drawn from a tileset texture
 - [ ] Solid tiles that block movement, using step 5
+- [ ] Raycasts hit solid tiles too, so the laser stops at the level's walls
 - [ ] Load levels from a simple text or JSON file
 - [ ] Camera that follows the player and stays inside the level
 

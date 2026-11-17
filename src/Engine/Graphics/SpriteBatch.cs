@@ -11,20 +11,25 @@ namespace Engine;
 /// Usage per pass (the scene through a camera, then the UI in window units):
 /// <code>
 /// Sprites.Begin(_camera.ViewProjection);
-/// Sprites.Draw(new Rect(center, size), Color.FromHex("#303340"));        // flat rectangle
-/// Sprites.Draw(crate, position, size: new(1f, 1f), Color.White);         // texture
+/// Sprites.Draw(new Rect(center, size), Color.FromHex("#303340"));                 // flat rectangle, layer 0
+/// Sprites.Draw(crate, position, size: new(1f, 1f), Color.White, layer: 10);       // whole texture
+/// Sprites.Draw(walk.FrameAt(time), position, size, Color.White, angle, layer: 5); // sprite sheet frame
 /// Sprites.End();
 /// </code>
 ///
-/// How it batches: each <c>Draw</c> only computes the sprite's 4 corners on the CPU and appends them
-/// to an array. Nothing reaches the GPU until the batch is flushed, and then all the sprites go in one
-/// buffer upload and one draw call. A flush happens at <see cref="End"/>, when the next sprite uses a
-/// different texture (one draw call can only sample one texture here), and when the array is full.
-/// So draw sprites that share a texture one after another: 600 floor tiles in a row cost one call.
+/// <b>Layers.</b> Each sprite has a layer number, and higher layers are drawn on top of lower ones,
+/// whatever order the calls came in. Within a layer, sprites keep their call order: later on top.
+/// To make that work, <c>Draw</c> only computes the sprite's 4 corners and stores them. At
+/// <see cref="End"/> the sprites are sorted by layer and sent to the GPU.
+///
+/// <b>Batching.</b> After sorting, runs of sprites that use the same texture go to the GPU in one
+/// buffer upload and one draw call. A new draw call starts when the texture changes (one draw call
+/// samples one texture here) or after 2048 sprites. So the fewer texture switches in layer order,
+/// the fewer draw calls: 600 floor tiles in one layer cost one call.
 /// </summary>
 public sealed class SpriteBatch : IDisposable
 {
-    private const int MaxSprites = 2048; // per flush; more sprites just mean more flushes
+    private const int MaxSpritesPerDraw = 2048; // size of the GPU buffer; more sprites just mean more draw calls
 
     private const string VertexShaderSource = """
         #version 330 core
@@ -74,9 +79,18 @@ public sealed class SpriteBatch : IDisposable
     private readonly uint _vao, _vbo, _ebo, _program;
     private readonly int _viewProjectionLocation;
 
-    private readonly Vertex[] _vertices = new Vertex[MaxSprites * 4];
-    private int _spriteCount;   // sprites waiting in _vertices
-    private Texture? _texture;  // the texture they all use
+    // The sprites of the current pass, in call order. Index i owns corners 4i..4i+3. The arrays
+    // grow (doubling) when a pass has more sprites than ever before, and are reused after that,
+    // so a steady scene allocates nothing per frame.
+    private Vertex[] _corners = new Vertex[MaxSpritesPerDraw * 4];
+    private Texture[] _textures = new Texture[MaxSpritesPerDraw];
+    private long[] _sortKeys = new long[MaxSpritesPerDraw];
+    private int[] _order = new int[MaxSpritesPerDraw];
+    private int _spriteCount;
+
+    // What one draw call sends: sprites copied here in layer order, then uploaded together.
+    private readonly Vertex[] _upload = new Vertex[MaxSpritesPerDraw * 4];
+
     private bool _begun;
 
     public SpriteBatch(GL gl)
@@ -86,20 +100,20 @@ public sealed class SpriteBatch : IDisposable
         _vao = gl.GenVertexArray();
         gl.BindVertexArray(_vao);
 
-        // The vertex buffer gets its size now and new contents every flush, so it's created empty.
+        // The vertex buffer gets its size now and new contents every draw call, so it's created empty.
         // StreamDraw tells the driver the data is written once and drawn once.
         _vbo = gl.GenBuffer();
         gl.BindBuffer(BufferTargetARB.ArrayBuffer, _vbo);
         unsafe
         {
-            gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(_vertices.Length * sizeof(Vertex)), null, BufferUsageARB.StreamDraw);
+            gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(_upload.Length * sizeof(Vertex)), null, BufferUsageARB.StreamDraw);
         }
 
         // The indices never change: every sprite is two triangles over its own 4 corners,
-        // 0 1 2 and 2 3 0, offset by 4 per sprite. So they're built once for the largest batch.
+        // 0 1 2 and 2 3 0, offset by 4 per sprite. So they're built once for the largest draw.
         // 16-bit indices are enough: 2048 sprites are 8192 corners, well under 65536.
-        var indices = new ushort[MaxSprites * 6];
-        for (int sprite = 0; sprite < MaxSprites; sprite++)
+        var indices = new ushort[MaxSpritesPerDraw * 6];
+        for (int sprite = 0; sprite < MaxSpritesPerDraw; sprite++)
         {
             int i = sprite * 6;
             ushort v = (ushort)(sprite * 4);
@@ -131,7 +145,7 @@ public sealed class SpriteBatch : IDisposable
         _program = ShaderProgram.Create(gl, VertexShaderSource, FragmentShaderSource);
         _viewProjectionLocation = gl.GetUniformLocation(_program, "uViewProjection");
 
-        // The sampler reads texture unit 0, the one Flush binds textures to. Set once, it stays.
+        // The sampler reads texture unit 0, the one DrawRun binds textures to. Set once, it stays.
         gl.UseProgram(_program);
         gl.Uniform1(gl.GetUniformLocation(_program, "uTexture"), 0);
 
@@ -158,7 +172,8 @@ public sealed class SpriteBatch : IDisposable
 
     /// <summary>
     /// Starts a pass. Every sprite until <see cref="End"/> goes through <paramref name="viewProjection"/>:
-    /// a camera's for the scene, <see cref="Game.ScreenProjection"/> for the UI.
+    /// a camera's for the scene, <see cref="Game.ScreenProjection"/> for the UI. Layers only sort
+    /// within a pass: everything in a later pass is drawn on top of everything in an earlier one.
     /// </summary>
     public void Begin(Matrix4x4 viewProjection)
     {
@@ -183,37 +198,62 @@ public sealed class SpriteBatch : IDisposable
         _gl.BlendFunc(BlendingFactor.One, BlendingFactor.OneMinusSrcAlpha);
     }
 
-    /// <summary>Draws everything still waiting and ends the pass.</summary>
+    /// <summary>Sorts the pass's sprites by layer, draws them, and ends the pass.</summary>
     public void End()
     {
         if (!_begun)
             throw new InvalidOperationException("SpriteBatch.End was called without Begin");
-        Flush();
         _begun = false;
-        _texture = null;
+
+        if (_spriteCount == 0)
+            return;
+
+        // Sort sprite indices by key. Each key holds the layer in its high 32 bits and the call
+        // number in its low 32 bits, so sorting by key orders by layer first and keeps call order
+        // within a layer. Sorting two arrays together (keys and indices) allocates nothing.
+        for (int i = 0; i < _spriteCount; i++)
+            _order[i] = i;
+        Array.Sort(_sortKeys, _order, 0, _spriteCount);
+
+        // Walk the sprites in layer order, copying their corners into the upload array. A texture
+        // change, or a full upload array, sends what's collected so far as one draw call.
+        Texture? runTexture = null;
+        int runLength = 0;
+        for (int i = 0; i < _spriteCount; i++)
+        {
+            int sprite = _order[i];
+            var texture = _textures[sprite];
+            if (runLength > 0 && (texture != runTexture || runLength == MaxSpritesPerDraw))
+            {
+                DrawRun(runTexture!, runLength);
+                runLength = 0;
+            }
+            runTexture = texture;
+            Array.Copy(_corners, sprite * 4, _upload, runLength * 4, 4);
+            runLength++;
+        }
+        DrawRun(runTexture!, runLength);
+
+        // Let go of the textures, so a texture disposed later isn't kept alive by this array.
+        Array.Clear(_textures, 0, _spriteCount);
+        _spriteCount = 0;
     }
 
     /// <summary>
-    /// Draws <paramref name="texture"/> stretched to <paramref name="size"/>, tinted by
-    /// <paramref name="tint"/> (<see cref="Color.White"/> leaves it as it is).
-    /// <paramref name="origin"/> is the point of the sprite that sits at <paramref name="position"/> and
-    /// that it turns around, from (0, 0) at the bottom left to (1, 1) at the top right; by default
-    /// the center. <paramref name="rotation"/> is in radians, counter-clockwise.
+    /// Draws <paramref name="region"/> (a whole <see cref="Texture"/> works too) stretched to
+    /// <paramref name="size"/>, tinted by <paramref name="tint"/> (<see cref="Color.White"/> leaves
+    /// it as it is). <paramref name="origin"/> is the point of the sprite that sits at
+    /// <paramref name="position"/> and that it turns around, from (0, 0) at the bottom left to (1, 1)
+    /// at the top right; by default the center. <paramref name="rotation"/> is in radians,
+    /// counter-clockwise. Higher <paramref name="layer"/>s are drawn on top.
     /// </summary>
-    public void Draw(Texture texture, Vector2 position, Vector2 size, Color tint, float rotation = 0f, Vector2? origin = null)
+    public void Draw(TextureRegion region, Vector2 position, Vector2 size, Color tint, float rotation = 0f, Vector2? origin = null, int layer = 0)
     {
         if (!_begun)
             throw new InvalidOperationException("SpriteBatch.Draw was called outside Begin/End");
 
-        if (texture != _texture)
-        {
-            Flush();
-            _texture = texture;
-        }
-        else if (_spriteCount == MaxSprites)
-        {
-            Flush();
-        }
+        if (_spriteCount == _textures.Length)
+            Grow();
 
         // The corners relative to the origin, before turning.
         var o = origin ?? new Vector2(0.5f);
@@ -229,40 +269,59 @@ public sealed class SpriteBatch : IDisposable
         var color = new Vector4(tint.R * tint.A, tint.G * tint.A, tint.B * tint.A, tint.A);
 
         // Corner order matches the index pattern: bottom left, bottom right, top right, top left.
-        // Texture coordinates put the image's bottom row at v = 0 (Texture flips images on load).
+        var uv0 = region.UvMin;
+        var uv1 = region.UvMax;
         int v = _spriteCount * 4;
-        _vertices[v] = new Vertex(Corner(left, bottom), new(0f, 0f), color);
-        _vertices[v + 1] = new Vertex(Corner(right, bottom), new(1f, 0f), color);
-        _vertices[v + 2] = new Vertex(Corner(right, top), new(1f, 1f), color);
-        _vertices[v + 3] = new Vertex(Corner(left, top), new(0f, 1f), color);
+        _corners[v] = new Vertex(Corner(left, bottom), uv0, color);
+        _corners[v + 1] = new Vertex(Corner(right, bottom), new(uv1.X, uv0.Y), color);
+        _corners[v + 2] = new Vertex(Corner(right, top), uv1, color);
+        _corners[v + 3] = new Vertex(Corner(left, top), new(uv0.X, uv1.Y), color);
+
+        _textures[_spriteCount] = region.Texture;
+        _sortKeys[_spriteCount] = ((long)layer << 32) | (uint)_spriteCount;
         _spriteCount++;
     }
 
     /// <summary>A flat-colored rectangle, turned by <paramref name="rotation"/> radians around its center.</summary>
-    public void Draw(Rect rect, Color color, float rotation = 0f) => Draw(WhitePixel, rect.Center, rect.Size, color, rotation);
+    public void Draw(Rect rect, Color color, float rotation = 0f, int layer = 0) =>
+        Draw(WhitePixel, rect.Center, rect.Size, color, rotation, layer: layer);
 
-    // Sends the waiting sprites to the GPU and draws them with one call.
-    private void Flush()
+    /// <summary>A flat-colored line from <paramref name="from"/> to <paramref name="to"/>, <paramref name="thickness"/> wide.</summary>
+    public void DrawLine(Vector2 from, Vector2 to, float thickness, Color color, int layer = 0)
     {
-        if (_spriteCount == 0 || _texture is null)
-            return;
+        // A rectangle whose left-middle point sits at `from`, as long as the line, turned toward `to`.
+        var delta = to - from;
+        Draw(WhitePixel, from, new Vector2(delta.Length(), thickness), color,
+            rotation: MathF.Atan2(delta.Y, delta.X), origin: new Vector2(0f, 0.5f), layer: layer);
+    }
 
+    private void Grow()
+    {
+        int capacity = _textures.Length * 2;
+        Array.Resize(ref _corners, capacity * 4);
+        Array.Resize(ref _textures, capacity);
+        Array.Resize(ref _sortKeys, capacity);
+        Array.Resize(ref _order, capacity);
+    }
+
+    // Sends the first `count` sprites of the upload array to the GPU and draws them with one call.
+    private void DrawRun(Texture texture, int count)
+    {
         _gl.ActiveTexture(TextureUnit.Texture0);
-        _gl.BindTexture(TextureTarget.Texture2D, _texture.Handle);
+        _gl.BindTexture(TextureTarget.Texture2D, texture.Handle);
 
         unsafe
         {
             // "Orphaning": asking for fresh storage before writing. If the GPU is still drawing from
             // the previous contents, the driver hands over a new block instead of making the CPU
             // wait for the GPU to finish with the old one.
-            _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(_vertices.Length * sizeof(Vertex)), null, BufferUsageARB.StreamDraw);
-            _gl.BufferSubData<Vertex>(BufferTargetARB.ArrayBuffer, 0, _vertices.AsSpan(0, _spriteCount * 4));
-            _gl.DrawElements(PrimitiveType.Triangles, (uint)(_spriteCount * 6), DrawElementsType.UnsignedShort, (void*)0);
+            _gl.BufferData(BufferTargetARB.ArrayBuffer, (nuint)(_upload.Length * sizeof(Vertex)), null, BufferUsageARB.StreamDraw);
+            _gl.BufferSubData<Vertex>(BufferTargetARB.ArrayBuffer, 0, _upload.AsSpan(0, count * 4));
+            _gl.DrawElements(PrimitiveType.Triangles, (uint)(count * 6), DrawElementsType.UnsignedShort, (void*)0);
         }
 
         DrawCalls++;
-        SpritesDrawn += _spriteCount;
-        _spriteCount = 0;
+        SpritesDrawn += count;
     }
 
     public void Dispose()

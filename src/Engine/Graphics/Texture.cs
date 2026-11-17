@@ -8,11 +8,12 @@ namespace Engine;
 public enum TextureFilter
 {
     Nearest, // each screen pixel takes the closest texel: crisp, blocky (pixel art, debug grids)
-    Linear,  // blends the 4 closest texels: smooth (detailed art, scaled sprites)
+    Linear,  // blends the closest texels, with mipmaps: smooth at any size (detailed art drawn smaller than its pixels)
 }
 
 /// <summary>
-/// An image on the GPU, ready to be drawn by <see cref="SpriteBatch"/>.
+/// An image on the GPU, ready to be drawn by <see cref="SpriteBatch"/>, whole or in parts
+/// (<see cref="TextureRegion"/>).
 /// <code>
 /// var crate = Texture.Load(GL, "Assets/crate.png");
 /// ...
@@ -64,9 +65,22 @@ public sealed class Texture : IDisposable
         gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)width, (uint)height, 0,
             PixelFormat.Rgba, PixelType.UnsignedByte, rgba);
 
-        var glFilter = filter == TextureFilter.Nearest ? GLEnum.Nearest : GLEnum.Linear;
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)glFilter);
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)glFilter);
+        if (filter == TextureFilter.Nearest)
+        {
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
+        }
+        else
+        {
+            // Mipmaps are pre-shrunk copies of the image: half size, quarter size, ... down to 1x1.
+            // Art drawn much smaller than its pixel size (a 512 px soldier shown 70 px tall) samples
+            // the copy closest to its screen size, instead of skipping over pixels, which would
+            // shimmer as the sprite moves. LinearMipmapLinear blends between the two closest copies.
+            // Premultiplied pixels shrink correctly: transparent pixels add nothing to the average.
+            gl.GenerateMipmap(TextureTarget.Texture2D);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.LinearMipmapLinear);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        }
 
         // Clamp instead of repeat: with linear filtering, repeat would blend the opposite edge into
         // a sprite's border.

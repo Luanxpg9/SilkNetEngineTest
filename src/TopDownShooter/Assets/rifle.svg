@@ -1,0 +1,142 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="784" height="128" viewBox="0 0 784 128">
+  <!--
+    M16A4 seen from above, pointing right (+X), drawn at 400 px per world unit.
+    Key points the game uses (pixels): butt plate at (16, 64), laser aperture at (604, 40), muzzle at (748, 64).
+    Left to right: A2 fixed stock, charging handle, flat-top upper with Picatinny rail, red dot sight,
+    quad-rail handguard with a ladder cover, laser aiming module on the left side rail,
+    A2 front sight base, barrel, A2 birdcage flash hider.
+  -->
+  <defs>
+    <!-- Cylindrical shading across the width: dark edges, a highlight just above the middle (light from the top of the image). -->
+    <linearGradient id="polymer" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#151617"/>
+      <stop offset="0.3" stop-color="#3a3c40"/>
+      <stop offset="0.5" stop-color="#2c2e31"/>
+      <stop offset="1" stop-color="#101112"/>
+    </linearGradient>
+    <linearGradient id="alu" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#18191b"/>
+      <stop offset="0.35" stop-color="#4a4d53"/>
+      <stop offset="0.55" stop-color="#36383d"/>
+      <stop offset="1" stop-color="#131415"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#17181a"/>
+      <stop offset="0.4" stop-color="#5d6168"/>
+      <stop offset="0.55" stop-color="#43464c"/>
+      <stop offset="1" stop-color="#121314"/>
+    </linearGradient>
+    <linearGradient id="fde" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5e5340"/>
+      <stop offset="0.35" stop-color="#ad9d7c"/>
+      <stop offset="0.6" stop-color="#94856a"/>
+      <stop offset="1" stop-color="#4f4535"/>
+    </linearGradient>
+    <radialGradient id="redLens" cx="0.4" cy="0.4" r="0.7">
+      <stop offset="0" stop-color="#ff6a5a"/>
+      <stop offset="0.5" stop-color="#b3201c"/>
+      <stop offset="1" stop-color="#3a0808"/>
+    </radialGradient>
+    <radialGradient id="irLens" cx="0.4" cy="0.4" r="0.7">
+      <stop offset="0" stop-color="#7a8a9a"/>
+      <stop offset="1" stop-color="#1a2028"/>
+    </radialGradient>
+
+    <!-- Picatinny rail seen from above: a slot every 7.35 px (10 mm at this scale). -->
+    <pattern id="railSlots" x="0" y="0" width="7.35" height="64" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="7.35" height="64" fill="#2b2d31"/>
+      <rect x="0.6" y="0" width="3.6" height="64" fill="#0d0e0f"/>
+      <rect x="4.2" y="0" width="0.9" height="64" fill="#55595f"/>
+    </pattern>
+    <!-- Ribs of a rubber ladder rail cover. -->
+    <pattern id="ladderRibs" x="0" y="0" width="7.35" height="64" patternUnits="userSpaceOnUse">
+      <rect x="0" y="0" width="7.35" height="64" fill="#1e1f21"/>
+      <rect x="0" y="0" width="2.4" height="64" fill="#34363a"/>
+    </pattern>
+
+    <filter id="shadow" x="-5%" y="-40%" width="110%" height="180%">
+      <feDropShadow dx="2" dy="4" stdDeviation="3" flood-color="#000" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <g filter="url(#shadow)">
+    <!-- A2 fixed stock: tapers from the butt plate to the receiver. -->
+    <path d="M24,46 L198,53 L198,75 L24,82 Q15,82 15,73 L15,55 Q15,46 24,46 Z" fill="url(#polymer)"/>
+    <path d="M30,58 L192,60" stroke="#5a5d62" stroke-width="1.5" stroke-linecap="round" opacity="0.6"/>
+    <rect x="15" y="46" width="7" height="36" rx="3" fill="#0e0f10"/>
+    <path d="M44,49 L44,79" stroke="#0b0c0d" stroke-width="1.2" opacity="0.8"/>
+    <path d="M46,50 L46,78" stroke="#4a4d52" stroke-width="0.8" opacity="0.6"/>
+    <rect x="196" y="52" width="9" height="24" rx="2" fill="#1a1b1d"/>
+
+    <!-- Lower receiver, peeking out on both sides of the upper. Bolt catch on the left, magazine release on the right. -->
+    <rect x="204" y="49" width="160" height="30" rx="3" fill="#232528"/>
+    <rect x="222" y="44" width="12" height="7" rx="2" fill="url(#alu)"/>
+    <rect x="300" y="77" width="12" height="6" rx="2" fill="url(#alu)"/>
+
+    <!-- Flat-top upper receiver with its Picatinny rail. -->
+    <rect x="204" y="51" width="190" height="26" rx="3" fill="url(#alu)"/>
+    <rect x="213" y="56" width="177" height="16" fill="url(#railSlots)"/>
+    <path d="M213,56.5 H390 M213,71.5 H390" stroke="#5f636a" stroke-width="1"/>
+
+    <!-- Forward assist and brass deflector on the right side (bottom of the image). -->
+    <rect x="234" y="76" width="14" height="8" rx="2" fill="url(#alu)"/>
+    <circle cx="241" cy="85" r="5.5" fill="url(#steel)" stroke="#111" stroke-width="1"/>
+    <path d="M262,77 Q270,86 280,77 Z" fill="#2a2c30"/>
+
+    <!-- Charging handle: a T across the back of the upper, with its latch on the left. -->
+    <rect x="200" y="41" width="10" height="46" rx="3" fill="url(#steel)"/>
+    <rect x="203" y="36" width="13" height="10" rx="3" fill="#2c2e32" stroke="#111" stroke-width="1"/>
+
+    <!-- Red dot sight: a 30 mm tube on a mount, wider than the rail it sits on. -->
+    <rect x="306" y="52" width="38" height="24" rx="3" fill="#1b1c1e"/>
+    <rect x="333" y="43" width="11" height="9" rx="2" fill="#26282b"/>
+    <rect x="292" y="48" width="60" height="32" rx="7" fill="url(#alu)"/>
+    <rect x="288" y="47" width="10" height="34" rx="4" fill="url(#steel)"/>
+    <rect x="346" y="46" width="10" height="36" rx="4" fill="url(#steel)"/>
+    <rect x="354.5" y="50" width="2" height="28" rx="1" fill="#8a2a3a" opacity="0.75"/>
+    <circle cx="322" cy="64" r="9.5" fill="url(#steel)" stroke="#0f1011" stroke-width="1.2"/>
+    <circle cx="322" cy="64" r="6.5" fill="none" stroke="#6a6e75" stroke-width="1" stroke-dasharray="1.5 1.5"/>
+    <circle cx="322" cy="64" r="2" fill="#0f1011"/>
+    <rect x="315" y="79" width="14" height="9" rx="3" fill="url(#steel)" stroke="#0f1011" stroke-width="1"/>
+    <rect x="308" y="40" width="14" height="9" rx="3" fill="#26282b" stroke="#0f1011" stroke-width="1"/>
+
+    <!-- Quad-rail handguard: delta ring at the back, top rail with a ladder cover on its rear half,
+         side rails seen edge-on along both edges, end cap at the front. -->
+    <rect x="392" y="47" width="220" height="34" rx="4" fill="url(#polymer)"/>
+    <rect x="394" y="47" width="216" height="5" fill="url(#railSlots)"/>
+    <rect x="394" y="76" width="216" height="5" fill="url(#railSlots)"/>
+    <rect x="400" y="56" width="206" height="16" fill="url(#railSlots)"/>
+    <path d="M400,56.5 H606 M400,71.5 H606" stroke="#5f636a" stroke-width="1"/>
+    <rect x="404" y="54" width="86" height="20" rx="3" fill="url(#ladderRibs)" stroke="#0e0f10" stroke-width="1"/>
+    <rect x="388" y="44" width="9" height="40" rx="3" fill="url(#alu)"/>
+    <rect x="606" y="49" width="8" height="30" rx="2" fill="url(#alu)"/>
+
+    <!-- Laser aiming module (flat dark earth), clamped to the left side rail. -->
+    <rect x="552" y="43" width="36" height="6" rx="1.5" fill="#1a1b1d"/>
+    <rect x="538" y="22" width="64" height="25" rx="4" fill="url(#fde)" stroke="#3b3326" stroke-width="1"/>
+    <circle cx="550" cy="34.5" r="7" fill="#7e7058" stroke="#3b3326" stroke-width="1"/>
+    <circle cx="550" cy="34.5" r="3" fill="#5a4f3c"/>
+    <rect x="562" y="27" width="9" height="15" rx="2.5" fill="#4b4232"/>
+    <circle cx="582" cy="28" r="2.6" fill="#4b4232"/>
+    <circle cx="582" cy="41" r="2.6" fill="#4b4232"/>
+    <path d="M592,24 V45" stroke="#3b3326" stroke-width="1"/>
+    <!-- Two apertures on the front face: infrared (upper) and the visible red laser (lower, at y = 40). -->
+    <rect x="598" y="25" width="7" height="8" rx="2.5" fill="url(#irLens)" stroke="#2a241a" stroke-width="0.8"/>
+    <rect x="598" y="36" width="7" height="8" rx="2.5" fill="url(#redLens)" stroke="#2a241a" stroke-width="0.8"/>
+
+    <!-- Barrel, from the handguard to the flash hider. -->
+    <rect x="612" y="58" width="108" height="12" rx="3" fill="url(#steel)"/>
+
+    <!-- A2 front sight base: the clamp around the barrel, the two protective ears, the post between them. -->
+    <rect x="613" y="54" width="28" height="20" rx="3" fill="url(#steel)" stroke="#0f1011" stroke-width="1"/>
+    <rect x="621" y="50" width="15" height="5" rx="1.5" fill="url(#steel)" stroke="#0f1011" stroke-width="0.8"/>
+    <rect x="621" y="73" width="15" height="5" rx="1.5" fill="url(#steel)" stroke="#0f1011" stroke-width="0.8"/>
+    <rect x="626.5" y="61.5" width="4" height="5" rx="1" fill="#0b0b0c"/>
+
+    <!-- A2 birdcage flash hider, with its slots; muzzle at x = 748. -->
+    <rect x="716" y="57" width="32" height="14" rx="3" fill="url(#steel)" stroke="#0f1011" stroke-width="1"/>
+    <rect x="721" y="60" width="20" height="2.6" rx="1.3" fill="#0b0b0c"/>
+    <rect x="721" y="65.4" width="20" height="2.6" rx="1.3" fill="#0b0b0c"/>
+    <rect x="744" y="58" width="4" height="12" rx="1.5" fill="#26282b"/>
+  </g>
+</svg>

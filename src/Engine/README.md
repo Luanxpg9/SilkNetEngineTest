@@ -10,8 +10,10 @@ Everything is in the `Engine` namespace.
 | [`Input/Input.cs`](Input/Input.cs) | Keyboard and mouse state: held, pressed and released (per frame or per fixed step), mouse position |
 | [`Log.cs`](Log.cs) | Console logging with three levels (info, warning, error) that can be filtered or turned off |
 | [`Graphics/Camera2D.cs`](Graphics/Camera2D.cs) | Orthographic 2D camera: position, view height, matrices, screen-to-world |
-| [`Graphics/SpriteBatch.cs`](Graphics/SpriteBatch.cs) | Draws many textured, tinted, rotated sprites (and flat rectangles) in few draw calls |
-| [`Graphics/Texture.cs`](Graphics/Texture.cs) | An image on the GPU: loads PNGs, premultiplies alpha, nearest or linear filtering |
+| [`Graphics/SpriteBatch.cs`](Graphics/SpriteBatch.cs) | Draws many textured, tinted, rotated sprites (and flat rectangles and lines) in few draw calls, sorted by layer |
+| [`Graphics/Texture.cs`](Graphics/Texture.cs) | An image on the GPU: loads PNGs, premultiplies alpha, nearest or linear filtering (with mipmaps) |
+| [`Graphics/TextureRegion.cs`](Graphics/TextureRegion.cs) | A rectangle inside a texture: one frame of a sprite sheet, cut by pixels or as a grid |
+| [`Graphics/Animation.cs`](Graphics/Animation.cs) | Frame animation: a list of regions and a frame duration; asks "which frame at time t" |
 | [`Graphics/GLDebug.cs`](Graphics/GLDebug.cs) | In Debug builds, sends the driver's OpenGL errors and warnings to `Log` |
 | [`Graphics/ShaderProgram.cs`](Graphics/ShaderProgram.cs) | Compiles and links GLSL, throwing with the driver's log on errors |
 | [`Rect.cs`](Rect.cs) | Axis-aligned rectangle: center and size only, for layout, hit testing and drawing |
@@ -76,6 +78,23 @@ protected override void Unload() => _crate.Dispose();
 Sprites.Draw(_crate, position: new(3f, 2f), size: new(1.5f, 1.5f), Color.White);
 ```
 
+### Sprite sheets, animation and layers
+
+A sprite sheet is one texture holding many frames. `TextureRegion` picks one out, and `Animation` plays a list of them:
+
+```csharp
+var sheet = Texture.Load(GL, "Assets/legs_walk.png");
+var walk = new Animation(TextureRegion.Grid(sheet, columns: 8, rows: 1), frameDuration: 0.08f);
+
+// each frame, for something that's walking:
+_walkTime += deltaTime;
+Sprites.Draw(walk.FrameAt(_walkTime), position, size, Color.White, rotation: angle, layer: 20);
+```
+
+`TextureRegion.FromPixels(texture, x, y, width, height)` takes a rectangle the way an image editor shows it (y from the top). A whole `Texture` converts to a region by itself, so every `Draw` takes either. An `Animation` holds no clock: each thing playing it keeps its own time, so one animation can be shared.
+
+Every `Draw` takes a `layer` (default 0). Higher layers cover lower ones, whatever order the calls come in, so a game can name its layers (floor, bodies, weapons, effects) and draw things in any order. Within a layer, later calls are on top. `DrawLine(from, to, thickness, color, layer)` draws a flat line, like a laser beam.
+
 `Sprites.DrawCalls` and `Sprites.SpritesDrawn` count this frame's work. Read them in `Update` to get the numbers for the whole previous frame.
 
 ### Logging
@@ -93,7 +112,7 @@ The default is `LogLevel.Info`, so everything shows. An interpolated message (`$
 ## How it works
 
 1. **The game loop (`Game`).** The constructor creates a 1280×720 window with an OpenGL 3.3 core context and hooks Silk.NET's window events. `Run` opens it and loops until `Exit`.
-   - **Load.** The GL context only exists once the window is running, so `Game` creates `GL` and `Input` in Silk.NET's `Load` event, logs the OpenGL version and GPU, turns on GL error reporting in Debug builds (see 7 below), creates `Sprites`, then calls the game's `Load` and `Resized`.
+   - **Load.** The GL context only exists once the window is running, so `Game` creates `GL` and `Input` in Silk.NET's `Load` event, logs the OpenGL version and GPU, turns on GL error reporting in Debug builds (see 8 below), creates `Sprites`, then calls the game's `Load` and `Resized`.
    - **Each frame:** Silk.NET processes events, `Input.BeginFrame()` takes this frame's snapshot, `FixedUpdate` runs zero or more times, `Update` runs once, then the screen is cleared to `ClearColor` and `Draw` runs once.
    - **Fixed step.** Frame time goes into an accumulator, and `FixedUpdate` runs once for every whole `FixedTimeStep` (1/60 s by default) in it. The same simulation then gives the same result on a 60 Hz and a 240 Hz screen. After a long hitch, at most 8 steps run and the rest is dropped. `FixedStepAlpha` (0..1) says how far into the next step the clock is, so `Draw` can blend between the last two fixed-step positions if motion looks choppy.
    - **Which update?** `FixedUpdate` for simulation that must not depend on frame rate: movement, timers, AI, firing. `Update` for things that should follow the screen smoothly, like the camera and the UI. All of `Input` works in both (see below).
@@ -110,11 +129,12 @@ The default is `LogLevel.Info`, so everything shows. An interpolated message (`$
    - The flags are plain `bool` arrays indexed by the enum value, so nothing allocates while the game runs. Out-of-range values like `Key.Unknown` (-1) are ignored.
    - `MousePosition` is read once per frame, in window units. `MouseWorldPosition(camera)` turns it into world units with `Camera2D.ScreenToWorld`. `Cursor` sets the cursor shape and ignores repeated sets, so it's fine to assign every frame.
 3. **Sprites (`SpriteBatch`).** A sprite is a textured quad with a position, size, rotation, origin and tint. Flat rectangles are sprites too: they use `WhitePixel`, a 1×1 white texture, tinted with the color.
-   - **Corners on the CPU.** Each `Draw` computes the sprite's 4 corners itself, the same math as a model matrix (scale, rotate, translate), and appends them to an array with a texture coordinate and the tint. So the shader needs only one matrix, the pass's `uViewProjection`, and there are no per-sprite uniforms that would force a draw call each.
+   - **Corners on the CPU.** Each `Draw` computes the sprite's 4 corners itself, the same math as a model matrix (scale, rotate, translate), and stores them with a texture coordinate and the tint. So the shader needs only one matrix, the pass's `uViewProjection`, and there are no per-sprite uniforms that would force a draw call each. The texture coordinates come from the `TextureRegion`, so a sheet frame is just a smaller rectangle of the same texture.
+   - **Layers, sorted at the end.** `Draw` doesn't send anything yet: it stores the corners, the texture and a sort key. The key holds the layer in its high 32 bits and the call number in its low 32 bits. At `End`, sorting the keys orders sprites by layer and keeps call order within a layer, and `Array.Sort(keys, indices)` does it without allocating. The arrays double when a pass has more sprites than ever before and are reused after that.
    - **Origin.** The point of the sprite that sits at `position` and that it turns around, from (0, 0) at the bottom left to (1, 1) at the top right. The default (0.5, 0.5) is the center.
-   - **One buffer, refilled.** The vertex buffer is sized for 2048 sprites and refilled at every flush with `BufferSubData`, after "orphaning" it with `BufferData(null)` so the CPU never waits for the GPU to finish drawing the previous contents. The index buffer never changes: `0 1 2 2 3 0` per sprite, offset by 4, built once.
-   - **Flushing.** Nothing is drawn until a flush: at `End`, when a sprite uses a different texture than the one before it, or when 2048 sprites are waiting. Each flush is one upload and one `DrawElements`. So sprites that share a texture should be drawn one after another; the shooter's 604 floor and wall sprites are one draw call.
-   - **Passes.** `Begin(viewProjection)` starts a pass: a camera's matrix for the scene, `ScreenProjection` for the UI. It sets the shader, VAO and blending every time, so the batch doesn't depend on state left by other code.
+   - **One buffer, refilled.** The vertex buffer is sized for 2048 sprites and refilled for every draw call with `BufferSubData`, after "orphaning" it with `BufferData(null)` so the CPU never waits for the GPU to finish drawing the previous contents. The index buffer never changes: `0 1 2 2 3 0` per sprite, offset by 4, built once.
+   - **Batching.** After sorting, `End` walks the sprites in layer order and copies their corners into the upload array. When the texture changes, or 2048 sprites are collected, what's there goes out as one upload and one `DrawElements`. So the fewer texture switches in layer order, the fewer draw calls: the shooter's 604 floor and wall sprites share the white pixel in one layer and cost one call; the whole scene takes 9.
+   - **Passes.** `Begin(viewProjection)` starts a pass: a camera's matrix for the scene, `ScreenProjection` for the UI. It sets the shader, VAO and blending every time, so the batch doesn't depend on state left by other code. Layers only sort within a pass: a later pass is always on top.
    - **Counting.** `DrawCalls` and `SpritesDrawn` count flushes and sprites since the frame started (`Game` resets them before `Draw`).
    - **Cleanup.** `SpriteBatch` is `IDisposable` and deletes its buffers, VAO, program and `WhitePixel`. `Game` creates one as `Sprites` and disposes it before the GL context.
 4. **Shapes and colors are separate (`Rect`, `Color`).** A `Rect` is only where and how big: `Center` and `Size`. Color is passed alongside when drawing: `Sprites.Draw(rect, color)`. That way hit testing, layout, and later collision boxes and sprite regions don't carry a color they don't need.
@@ -126,9 +146,11 @@ The default is `LogLevel.Info`, so everything shows. An interpolated message (`$
 
 6. **Textures (`Texture`).** `Texture.Load` reads an image with StbImageSharp as RGBA bytes and uploads it with `TexImage2D`. A relative path starts at the folder the game runs from, where the Assets folder is copied, so it works whatever the working directory is.
    - **Flipped on load.** Image files store the top row first, but OpenGL's texture coordinate v = 0 is the bottom row. Flipping makes them agree, so sprites aren't upside down in the world (y up). Note: under `ScreenProjection` (y down) a textured sprite would appear upside down; the UI only uses flat rectangles so far.
-   - **Filtering.** `Linear` blends neighboring texels, for smooth art. `Nearest` keeps hard pixels. Edges clamp instead of wrapping, so the opposite edge never bleeds into a sprite's border.
+   - **Filtering.** `Linear` blends neighboring texels, for smooth art, and builds mipmaps: copies of the image at half size, quarter size and so on, made by `GenerateMipmap`. Art drawn much smaller than its pixel size (the shooter's 400 px per unit art is shown at about 90 px per unit) then samples the copy closest to its screen size instead of skipping pixels, which would shimmer as it moves. `Nearest` keeps hard pixels and has no mipmaps. Edges clamp instead of wrapping, so the opposite edge never bleeds into a sprite's border.
+   - **Regions (`TextureRegion`).** A rectangle of a texture in texture coordinates (`UvMin`, `UvMax`). `FromPixels` converts from image-editor pixels (y down from the top) to texture coordinates (v up from the bottom, since the image was flipped). `Grid` cuts a sheet into equal cells in reading order. Filtering and mipmaps average neighboring pixels, so each frame needs transparent space around it inside its cell, or it picks up a sliver of the next frame.
    - **Premultiplied alpha.** Red, green and blue are multiplied by alpha when the image loads, so a fully transparent pixel really is (0, 0, 0, 0). With plain alpha it would keep a color (often black) that linear filtering mixes into the visible pixels beside it: a dark outline around every sprite. The batcher blends with `One, OneMinusSrcAlpha`, the matching "over" operation, and premultiplies the tint the same way.
-7. **GL error reporting (`GLDebug`).** In Debug builds, `Game` asks for a debug context and registers a callback through `KHR_debug` (core in GL 4.3, an extension on most drivers under 3.3). The driver then reports wrong calls the moment they happen: errors as `Log.Error`, performance and other warnings as `Log.Warning`. Messages are synchronous, so a breakpoint in the callback shows the guilty call on the stack. The callback delegate is kept in a static field, because the driver holds a pointer to it and the garbage collector would otherwise free it. Plain notifications and NVIDIA's harmless "shader recompiled" note are skipped. Release builds skip all of it, since the checks cost time.
+7. **Animation (`Animation`).** A list of regions and a frame duration. `FrameIndexAt(time)` is `floor(time / duration)`, wrapped around for looping animations (negative times too, so a cycle can play backwards) or held on the last frame otherwise. It keeps no time of its own, so many characters can share one animation, each at its own point.
+8. **GL error reporting (`GLDebug`).** In Debug builds, `Game` asks for a debug context and registers a callback through `KHR_debug` (core in GL 4.3, an extension on most drivers under 3.3). The driver then reports wrong calls the moment they happen: errors as `Log.Error`, performance and other warnings as `Log.Warning`. Messages are synchronous, so a breakpoint in the callback shows the guilty call on the stack. The callback delegate is kept in a static field, because the driver holds a pointer to it and the garbage collector would otherwise free it. Plain notifications and NVIDIA's harmless "shader recompiled" note are skipped. Release builds skip all of it, since the checks cost time.
 
 > **Screen to world.** Mouse positions arrive in window pixels with y pointing down. `Camera2D.ScreenToWorld` turns them into normalized device coordinates (-1..1, y up), scales by half the visible size and adds the camera position. That's the inverse of the camera's matrices, worked out by hand because an orthographic camera makes it simple.
 
