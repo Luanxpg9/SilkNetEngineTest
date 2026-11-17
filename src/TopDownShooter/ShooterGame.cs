@@ -3,9 +3,10 @@ using Engine;
 using Silk.NET.Input;
 
 /// <summary>
-/// The top-down shooter. So far: a player that walks around a checkered arena with WASD,
-/// faces the mouse, and is followed by the camera. A crate sits in the arena as the first textured
-/// sprite. F3 logs how many sprites and draw calls the last frame took.
+/// The top-down shooter. So far: a soldier who walks around a checkered arena with WASD, aims an
+/// M16A4 at the mouse with a laser showing where it points, and is followed by the camera. A crate
+/// and an enemy (who only turns to watch) stand in the arena. F3 logs how many sprites and draw
+/// calls the last frame took.
 /// </summary>
 sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
 {
@@ -22,20 +23,26 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
     private static readonly Vector2 CratePosition = new(3f, 2f);
     private static readonly Vector2 CrateSize = new(1.5f);
 
-    // Shows 12 world units vertically: room to see what's coming, with the player still large on screen.
-    private readonly Camera2D _camera = new(viewHeight: 12f);
+    // Shows 8 world units vertically: room to see what's coming, with the soldier large enough
+    // for the rifle's details to read.
+    private readonly Camera2D _camera = new(viewHeight: 8f);
     private readonly Player _player = new(position: Vector2.Zero);
-    private Texture _crate = null!; // loaded in Load, once the GL context exists
+    private readonly Enemy _enemy = new(position: new Vector2(-5f, 3f));
+    private Art _art = null!;     // loaded in Load, once the GL context exists
+    private Vector2 _aimPoint;    // the mouse in world units, this frame
 
-    protected override void Load() => _crate = Texture.Load(GL, "Assets/crate.png");
+    protected override void Load() => _art = new Art(GL);
 
-    protected override void Unload() => _crate.Dispose();
+    protected override void Unload() => _art.Dispose();
 
     protected override void Resized(Vector2 framebufferSize) => _camera.AspectRatio = AspectRatio;
 
     // Simulation: movement belongs here, so it's identical at any frame rate.
     protected override void FixedUpdate(float step)
     {
+        // Remember where this step starts, before anything moves the player (see Player.DrawPosition).
+        _player.BeginFixedStep();
+
         // Held keys (IsDown) drive movement. WasPressed works here too (each press reaches exactly one
         // fixed step), which is what firing will use; Esc stays in Update because quitting isn't simulation.
         Vector2 direction = Vector2.Zero;
@@ -66,18 +73,23 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
         _camera.Position = playerAt;
 
         // Aim after moving the camera, so the mouse is converted to world units with this frame's view.
-        _player.FaceTowards(Input.MouseWorldPosition(_camera), from: playerAt);
+        _aimPoint = Input.MouseWorldPosition(_camera);
+        _player.FaceTowards(_aimPoint, from: playerAt);
+        _player.Animate(deltaTime);
+
+        _enemy.FaceTowards(playerAt);
     }
 
     protected override void Draw()
     {
         Sprites.Begin(_camera.ViewProjection);
 
-        // Drawn back to front. The floor and walls all use the white pixel, so they're one draw call;
-        // the crate switches texture (a second call), and the player switches back (a third).
+        // The order of these calls doesn't matter: layers decide what covers what. Within a layer,
+        // sprites with the same texture batch together (the 604 floor sprites are one draw call).
         DrawArena();
-        Sprites.Draw(_crate, CratePosition, CrateSize, Color.White);
-        _player.Draw(Sprites, _player.DrawPosition(FixedStepAlpha));
+        Sprites.Draw(_art.Crate, CratePosition, CrateSize, Color.White, layer: Layers.Props);
+        _enemy.Draw(Sprites, _art);
+        _player.Draw(Sprites, _art, _player.DrawPosition(FixedStepAlpha), _aimPoint);
 
         Sprites.End();
     }
@@ -90,15 +102,15 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
             for (int y = 0; y < ArenaHeight; y++)
             {
                 var center = new Vector2(x + 0.5f, y + 0.5f) - ArenaHalfSize;
-                Sprites.Draw(new Rect(center, Vector2.One), (x + y) % 2 == 0 ? TileColorA : TileColorB);
+                Sprites.Draw(new Rect(center, Vector2.One), (x + y) % 2 == 0 ? TileColorA : TileColorB, layer: Layers.Floor);
             }
 
         var outer = ArenaHalfSize * 2f + new Vector2(WallThickness * 2f);
         float wallY = ArenaHalfSize.Y + WallThickness / 2f;
         float wallX = ArenaHalfSize.X + WallThickness / 2f;
-        Sprites.Draw(new Rect(new(0f, wallY), new(outer.X, WallThickness)), WallColor);   // top
-        Sprites.Draw(new Rect(new(0f, -wallY), new(outer.X, WallThickness)), WallColor);  // bottom
-        Sprites.Draw(new Rect(new(-wallX, 0f), new(WallThickness, outer.Y)), WallColor);  // left
-        Sprites.Draw(new Rect(new(wallX, 0f), new(WallThickness, outer.Y)), WallColor);   // right
+        Sprites.Draw(new Rect(new(0f, wallY), new(outer.X, WallThickness)), WallColor, layer: Layers.Floor);   // top
+        Sprites.Draw(new Rect(new(0f, -wallY), new(outer.X, WallThickness)), WallColor, layer: Layers.Floor);  // bottom
+        Sprites.Draw(new Rect(new(-wallX, 0f), new(WallThickness, outer.Y)), WallColor, layer: Layers.Floor);  // left
+        Sprites.Draw(new Rect(new(wallX, 0f), new(WallThickness, outer.Y)), WallColor, layer: Layers.Floor);   // right
     }
 }

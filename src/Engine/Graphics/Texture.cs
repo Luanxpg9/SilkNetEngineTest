@@ -8,11 +8,12 @@ namespace Engine;
 public enum TextureFilter
 {
     Nearest, // each screen pixel takes the closest texel: crisp, blocky (pixel art, debug grids)
-    Linear,  // blends the 4 closest texels: smooth (detailed art, scaled sprites)
+    Linear,  // blends the closest texels, with mipmaps: smooth at any size (detailed art drawn smaller than its pixels)
 }
 
 /// <summary>
-/// An image on the GPU, ready to be drawn by <see cref="SpriteBatch"/>.
+/// An image on the GPU, ready to be drawn by <see cref="SpriteBatch"/>, whole or in parts
+/// (<see cref="TextureRegion"/>).
 /// <code>
 /// var crate = Texture.Load(GL, "Assets/crate.png");
 /// ...
@@ -28,6 +29,7 @@ public enum TextureFilter
 public sealed class Texture : IDisposable
 {
     private readonly GL _gl;
+    private bool _disposed;
 
     public uint Handle { get; }
     public int Width { get; }
@@ -43,6 +45,13 @@ public sealed class Texture : IDisposable
     {
         if (rgba.Length != width * height * 4)
             throw new ArgumentException($"Expected {width * height * 4} bytes for a {width}x{height} RGBA image, got {rgba.Length}", nameof(rgba));
+
+        // A texture bigger than the GPU allows fails silently in TexImage2D (only GLDebug, in Debug
+        // builds, would say so) and draws black. OpenGL 3.3 only promises 1024; desktop GPUs allow
+        // 16384 or more, some integrated ones 8192. Better to stop with a clear message.
+        gl.GetInteger(GetPName.MaxTextureSize, out int maxSize);
+        if (width > maxSize || height > maxSize)
+            throw new ArgumentException($"A {width}x{height} texture is larger than this GPU allows ({maxSize}x{maxSize}). Split it, or lay sheet frames out in a grid.");
 
         _gl = gl;
         Width = width;
@@ -64,9 +73,23 @@ public sealed class Texture : IDisposable
         gl.TexImage2D(TextureTarget.Texture2D, 0, InternalFormat.Rgba8, (uint)width, (uint)height, 0,
             PixelFormat.Rgba, PixelType.UnsignedByte, rgba);
 
-        var glFilter = filter == TextureFilter.Nearest ? GLEnum.Nearest : GLEnum.Linear;
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)glFilter);
-        gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)glFilter);
+        if (filter == TextureFilter.Nearest)
+        {
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.Nearest);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Nearest);
+        }
+        else
+        {
+            // Mipmaps are pre-shrunk copies of the image: half size, quarter size, ... down to 1x1.
+            // Art drawn much smaller than its pixel size (the shooter's 896 px soldier is shown about
+            // 200 px wide) samples
+            // the copy closest to its screen size, instead of skipping over pixels, which would
+            // shimmer as the sprite moves. LinearMipmapLinear blends between the two closest copies.
+            // Premultiplied pixels shrink correctly: transparent pixels add nothing to the average.
+            gl.GenerateMipmap(TextureTarget.Texture2D);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMinFilter, (int)GLEnum.LinearMipmapLinear);
+            gl.TexParameter(TextureTarget.Texture2D, TextureParameterName.TextureMagFilter, (int)GLEnum.Linear);
+        }
 
         // Clamp instead of repeat: with linear filtering, repeat would blend the opposite edge into
         // a sprite's border.
@@ -111,5 +134,13 @@ public sealed class Texture : IDisposable
         }
     }
 
-    public void Dispose() => _gl.DeleteTexture(Handle);
+    // Only once: OpenGL reuses texture names, so deleting this handle a second time could delete
+    // an unrelated texture created since.
+    public void Dispose()
+    {
+        if (_disposed)
+            return;
+        _disposed = true;
+        _gl.DeleteTexture(Handle);
+    }
 }

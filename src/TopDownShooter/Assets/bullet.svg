@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="32" viewBox="0 0 128 32">
+  <!--
+    First-pass bullet: a 5.56 tracer in flight, pointing right, drawn at 400 px per world unit
+    (0.32 x 0.08 units). A hot white-yellow core at the front, an orange-red glow trailing behind.
+    The glow fades to fully transparent before the edges, so it blends cleanly on any floor.
+  -->
+  <defs>
+    <linearGradient id="trail" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff3a10" stop-opacity="0"/>
+      <stop offset="0.6" stop-color="#ff5a1a" stop-opacity="0.55"/>
+      <stop offset="1" stop-color="#ffb040" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="core" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffd27a" stop-opacity="0"/>
+      <stop offset="0.5" stop-color="#ffe9a8"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-100%" width="140%" height="300%"><feGaussianBlur stdDeviation="3"/></filter>
+  </defs>
+  <rect x="10" y="10" width="106" height="12" rx="6" fill="url(#trail)" filter="url(#glow)"/>
+  <rect x="40" y="13" width="78" height="6" rx="3" fill="url(#core)"/>
+  <ellipse cx="114" cy="16" rx="5" ry="3.2" fill="#ffffff"/>
+</svg>

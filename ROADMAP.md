@@ -77,34 +77,42 @@ Built on Phase A; mostly bookkeeping on top of the batcher, plus the game's firs
 - **Hold:** shouldered, aiming straight ahead with both hands.
 - **Soldier:** modern kit: helmet, plate carrier, gloves.
 
-- [ ] Sprite sheet regions: draw a sub-rectangle of a texture
-- [ ] Frame animation: a sequence of regions with a frame duration
-- [ ] Draw order with layers (e.g. floor, bodies, weapon, effects)
-- [ ] **The player: a soldier seen from above, holding an M16A4** (see above). The rifle is the star, so it gets real detail
-- [ ] The rifle as its own layer on top of the soldier, so it can later recoil and show a muzzle flash
-- [ ] **Visible laser beam** from the laser module toward the aim point: a thin, semi-transparent red line with a brighter dot at the end, drawn on the effects layer. It helps the player aim. For now it ends at the mouse; once walls exist (steps 5 and 6) it should stop at the first wall it hits
-- [ ] Walk animation for the soldier
-- [ ] First-pass sprites for an enemy and a bullet, in the same style
+- [x] Sprite sheet regions: draw a sub-rectangle of a texture
+- [x] Frame animation: a sequence of regions with a frame duration
+- [x] Draw order with layers (e.g. floor, bodies, weapon, effects)
+- [x] **The player: a soldier seen from above, holding an M16A4** (see above). The rifle is the star, so it gets real detail
+- [x] The rifle as its own layer on top of the soldier, so it can later recoil and show a muzzle flash
+- [x] **Visible laser beam** from the laser module toward the aim point: a thin, semi-transparent red line with a brighter dot at the end, drawn on the effects layer. It helps the player aim. For now it ends at the mouse; step 5 changes it to stop at a maximum range or at the first body it hits
+- [x] Walk animation for the soldier
+- [x] First-pass sprites for an enemy and a bullet, in the same style
 
 **Done when:** the soldier walks with an animation, aims the M16 at the mouse with the laser beam showing where it points, and the rifle's details are readable in game.
 
 ### 4. Entities
 - [ ] Plain C# game objects with `Update` / `Draw`, owned by a scene (no ECS for now)
+- [ ] Smooth motion for every entity: the base holds `Position` and `PreviousPosition`, the scene copies one into the other for all entities at the start of each fixed step (as `Player.BeginFixedStep` does now), and spawning or teleporting sets both, so a new bullet doesn't slide in from (0, 0)
 - [ ] Spawn and destroy queues, so objects can be added or removed safely during an update
 - [ ] Finding objects by type or tag
-- [ ] Shooter: the player fires bullets toward the mouse; bullets disappear after a while
+- [ ] Shooter: the player fires bullets toward the mouse; bullets disappear after a while. Aim again in `FixedUpdate` from the real `Position` right before firing, so bullets leave along the laser line
+- [ ] Additive glow in `SpriteBatch`: an option that adds a sprite's light to what's under it instead of covering it, for tracers, muzzle flashes and the laser glow. With premultiplied alpha it's a color whose alpha is lowered (down to 0 for pure light), so it stays in the same batch
+- [ ] If F3 shows many draw calls once bullets and entities are in: upload all of a pass's sprites once and draw each texture run with `DrawElementsBaseVertex`, instead of one buffer upload per run
 
 ### 5. Top-down collision
 - [ ] Circle and axis-aligned box shapes, with circle-circle, box-box and circle-box tests
 - [ ] Collision layers and masks (player, enemy, bullet, wall)
 - [ ] Solid collisions (push out, slide along walls) vs. triggers (overlap events only)
 - [ ] A broad phase (uniform grid, like `src/Circles`) so hundreds of bullets stay cheap
+- [ ] Raycasts: cast a ray from a point in a direction, up to a maximum distance, and get the first shape it hits (which shape, where, how far), filtered by collision layers
 - [ ] Shooter: bullets hit enemies, enemies touch the player, nobody walks through walls
+- [ ] Shooter: the laser no longer ends at the mouse. It's a raycast from the laser module along the rifle, and the beam and its dot stop at the first body it hits (enemy, wall, crate) or at the laser's maximum range, whichever comes first
+- [ ] Shooter: a laser beam that doesn't shimmer as it turns. Its core is about 1.4 screen pixels wide with hard edges; keep it at least 2 pixels wide, or draw it with a small texture that fades across its width instead of the flat white pixel
 
 ### 6. Tilemap levels
 - [ ] Grid of tiles drawn from a tileset texture
 - [ ] Solid tiles that block movement, using step 5
+- [ ] Raycasts hit solid tiles too, so the laser stops at the level's walls
 - [ ] Load levels from a simple text or JSON file
+- [ ] Image loading that doesn't depend on a global setting: `Texture` flips the rows itself (in the same pass as premultiplying) instead of turning on StbImageSharp's process-wide flip flag, so tilesets and other images can later load on a background thread
 - [ ] Camera that follows the player and stays inside the level
 
 ### 7. Text and HUD
@@ -118,7 +126,7 @@ Built on Phase A; mostly bookkeeping on top of the batcher, plus the game's firs
 - [ ] Shooter: shot, hit and death sounds
 
 ### 9. The game
-- [ ] Enemies that chase the player
+- [ ] Enemies that chase the player, with a walk animation. Sprite sheets with many frames are laid out in a grid (the soldier's 8-frame walk as 4×2, 3072×1024, instead of one 6144 px row), so they stay within what integrated GPUs allow (often 8192 px)
 - [ ] Health, damage, death
 - [ ] Waves that get harder, and a score
 - [ ] Title, game over and restart screens

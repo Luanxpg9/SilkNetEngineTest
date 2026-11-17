@@ -8,9 +8,11 @@
   </PropertyGroup>
 
   <!-- Everything in Assets is copied next to the built game, keeping its folders, so
-       Texture.Load(GL, "Assets/crate.png") finds it whatever the working directory is. -->
+       Texture.Load(GL, "Assets/crate.png") finds it whatever the working directory is.
+       The SVG files are the art's editable sources (tools/export_art.py turns them into the PNGs),
+       so they stay out of the build. -->
   <ItemGroup>
-    <None Include="Assets\**" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Assets\**" Exclude="Assets\**\*.svg" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

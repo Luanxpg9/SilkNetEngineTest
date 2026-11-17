@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Where the laser beam lands: a bright pink-white center inside a red glow that fades to transparent. -->
+  <defs>
+    <radialGradient id="dot" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#fff2f0"/>
+      <stop offset="0.12" stop-color="#ff8a80"/>
+      <stop offset="0.3" stop-color="#ff2a1a" stop-opacity="0.75"/>
+      <stop offset="0.6" stop-color="#e01008" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#c00000" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="32" cy="32" r="32" fill="url(#dot)"/>
+</svg>
