@@ -50,17 +50,17 @@ The window, loop, input, camera, colors and quad rendering come from the engine;
 
 1. **Resize.** `Resized` keeps the camera's aspect ratio in step with the window.
 2. **Update.** Sandbox only uses `Update`, not `FixedUpdate`: physics keeps its own 1/240 s fixed step and is fed the real frame time, and the camera should follow the screen smoothly. Each frame, `Physics.Update` advances the bodies first. Then `Esc` and `G` are checked with `Input.WasPressed`, the mouse is handled (below), and WASD or the arrow keys (`Input.IsDown`) move the camera at a constant 1.5 units per second, scaled by delta time, with the direction normalized so diagonals aren't faster.
-3. **Drawing.** `Draw` calls `Quads.Begin()`, then two passes with the same quads:
-   - **Scene pass:** the camera's `ViewProjection`. Draw every body, then the drag preview if a drag is in progress.
-   - **UI pass:** the engine's `ScreenProjection`, which maps window units straight to the screen with (0, 0) at the top left. The toolbar panel, buttons and icons are drawn in those units, so the camera doesn't move them, and last, so they sit on top of the scene.
-4. **Toolbar and mouse.** `Toolbar` works in window pixels: the panel, one button per tool, hit testing (`ToolAt`) with plain `Rect`s, and icons built from small rectangles, so there's no texture or text rendering yet. `Toolbar.Draw` paints everything straight into `Quads`, choosing colors for the selected and hovered states, so nothing is allocated per frame. `HandleMouse` in `SandboxGame.cs` does the rest, using `Input.WasPressed` / `WasReleased` for the buttons and `Input.Cursor` for the crosshair:
+3. **Drawing.** `Draw` makes two passes with the engine's `Sprites`, each between `Begin` and `End`. Everything is a flat-colored rectangle, so each pass is one draw call:
+   - **Scene pass:** `Sprites.Begin(camera.ViewProjection)`. Every body is drawn as a `Rect` turned by its `Angle`, then the drag preview if a drag is in progress.
+   - **UI pass:** `Sprites.Begin(ScreenProjection)`. The engine's `ScreenProjection` which maps window units straight to the screen with (0, 0) at the top left. The toolbar panel, buttons and icons are drawn in those units, so the camera doesn't move them, and last, so they sit on top of the scene.
+4. **Toolbar and mouse.** `Toolbar` works in window pixels: the panel, one button per tool, hit testing (`ToolAt`) with plain `Rect`s, and icons built from small rectangles, so there's no texture or text rendering yet. `Toolbar.Draw` paints everything straight into the `SpriteBatch`, choosing colors for the selected and hovered states, so nothing is allocated per frame. `HandleMouse` in `SandboxGame.cs` does the rest, using `Input.WasPressed` / `WasReleased` for the buttons and `Input.Cursor` for the crosshair:
    - A left click on the panel selects or deselects a tool, or flips the gravity option while the Rectangle tool is selected. Panel clicks never reach the scene.
    - A left click in the scene with the Rectangle tool stores the drag's start in **world** units, using `Input.MouseWorldPosition(camera)`. Each frame, the preview spans from that start to the mouse's current world position, so panning the camera mid-drag keeps the start pinned to the world.
    - Releasing measures the dragged area with `Rect.FromCorners`, which accepts the two corners in any order, and adds a `Body` there that falls or not, depending on the gravity option.
 
 ## The physics
 
-Everything in the scene is a `Body`: a box with a `Position`, `Size`, `Angle`, `Velocity`, `AngularVelocity` and `Color`. Its `Model` matrix scales the engine's unit quad to `Size`, rotates it by `Angle`, then moves it to `Position`.
+Everything in the scene is a `Body`: a box with a `Position`, `Size`, `Angle`, `Velocity`, `AngularVelocity` and `Color`. It's drawn as a flat sprite: a `Rect` at `Position` with `Size`, turned by `Angle`.
 
 - **Mass.** A falling body gets its mass from its area, and a moment of inertia (resistance to spinning) of `m (w² + h²) / 12`, the formula for a solid rectangle. The solver stores the inverses, so a fixed body is just one with inverse mass 0, that is, infinitely heavy.
 

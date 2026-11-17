@@ -12,7 +12,7 @@ namespace Engine;
 /// Color.FromHex("#FF000080")   // red at about 50% opacity
 /// Color.White.WithAlpha(0.3f)  // white at 30% opacity
 /// </code>
-/// Note: alpha only shows on screen once blending is turned on (roadmap step 3 Phase A).
+/// <see cref="SpriteBatch"/> blends, so alpha shows on screen: a see-through sprite lets what was drawn before it show.
 /// </summary>
 public readonly record struct Color(float R, float G, float B, float A = 1f)
 {

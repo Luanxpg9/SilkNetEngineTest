@@ -4,7 +4,8 @@ using Silk.NET.Input;
 
 /// <summary>
 /// The top-down shooter. So far: a player that walks around a checkered arena with WASD,
-/// faces the mouse, and is followed by the camera.
+/// faces the mouse, and is followed by the camera. A crate sits in the arena as the first textured
+/// sprite. F3 logs how many sprites and draw calls the last frame took.
 /// </summary>
 sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
 {
@@ -16,9 +17,19 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
     private static readonly Color WallColor = Color.FromHex("#737885");
     private static readonly Vector2 ArenaHalfSize = new(ArenaWidth / 2f, ArenaHeight / 2f);
 
+    // The crate image has a transparent margin with its shadow in it, so it's drawn a bit larger
+    // than the 1.2 units the box itself should cover.
+    private static readonly Vector2 CratePosition = new(3f, 2f);
+    private static readonly Vector2 CrateSize = new(1.5f);
+
     // Shows 12 world units vertically: room to see what's coming, with the player still large on screen.
     private readonly Camera2D _camera = new(viewHeight: 12f);
     private readonly Player _player = new(position: Vector2.Zero);
+    private Texture _crate = null!; // loaded in Load, once the GL context exists
+
+    protected override void Load() => _crate = Texture.Load(GL, "Assets/crate.png");
+
+    protected override void Unload() => _crate.Dispose();
 
     protected override void Resized(Vector2 framebufferSize) => _camera.AspectRatio = AspectRatio;
 
@@ -45,6 +56,10 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
         if (Input.WasPressed(Key.Escape))
             Exit();
 
+        // Read during Update, so the numbers are from the whole previous frame.
+        if (Input.WasPressed(Key.F3))
+            Log.Info($"Last frame: {Sprites.SpritesDrawn} sprites in {Sprites.DrawCalls} draw calls");
+
         // The camera centers on where the player is drawn this frame, so the player stays still
         // on screen and the arena slides under it.
         var playerAt = _player.DrawPosition(FixedStepAlpha);
@@ -56,33 +71,34 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
 
     protected override void Draw()
     {
-        Quads.Begin();
-        Quads.SetViewProjection(_camera.ViewProjection);
+        Sprites.Begin(_camera.ViewProjection);
 
+        // Drawn back to front. The floor and walls all use the white pixel, so they're one draw call;
+        // the crate switches texture (a second call), and the player switches back (a third).
         DrawArena();
+        Sprites.Draw(_crate, CratePosition, CrateSize, Color.White);
+        _player.Draw(Sprites, _player.DrawPosition(FixedStepAlpha));
 
-        var playerAt = _player.DrawPosition(FixedStepAlpha);
-        Quads.Draw(_player.BodyModel(playerAt), Player.BodyColor);
-        Quads.Draw(_player.NoseModel(playerAt), Player.NoseColor);
+        Sprites.End();
     }
 
     // A checkerboard floor, so movement is visible while the camera follows the player, and a wall around it.
-    // That's 600 tiles, one draw call each: fine for now, and the sprite batcher in step 3 will make it one call.
+    // That's 604 flat sprites, batched into a single draw call.
     private void DrawArena()
     {
         for (int x = 0; x < ArenaWidth; x++)
             for (int y = 0; y < ArenaHeight; y++)
             {
                 var center = new Vector2(x + 0.5f, y + 0.5f) - ArenaHalfSize;
-                Quads.Draw(new Rect(center, Vector2.One), (x + y) % 2 == 0 ? TileColorA : TileColorB);
+                Sprites.Draw(new Rect(center, Vector2.One), (x + y) % 2 == 0 ? TileColorA : TileColorB);
             }
 
         var outer = ArenaHalfSize * 2f + new Vector2(WallThickness * 2f);
         float wallY = ArenaHalfSize.Y + WallThickness / 2f;
         float wallX = ArenaHalfSize.X + WallThickness / 2f;
-        Quads.Draw(new Rect(new(0f, wallY), new(outer.X, WallThickness)), WallColor);   // top
-        Quads.Draw(new Rect(new(0f, -wallY), new(outer.X, WallThickness)), WallColor);  // bottom
-        Quads.Draw(new Rect(new(-wallX, 0f), new(WallThickness, outer.Y)), WallColor);  // left
-        Quads.Draw(new Rect(new(wallX, 0f), new(WallThickness, outer.Y)), WallColor);   // right
+        Sprites.Draw(new Rect(new(0f, wallY), new(outer.X, WallThickness)), WallColor);   // top
+        Sprites.Draw(new Rect(new(0f, -wallY), new(outer.X, WallThickness)), WallColor);  // bottom
+        Sprites.Draw(new Rect(new(-wallX, 0f), new(WallThickness, outer.Y)), WallColor);  // left
+        Sprites.Draw(new Rect(new(wallX, 0f), new(WallThickness, outer.Y)), WallColor);   // right
     }
 }

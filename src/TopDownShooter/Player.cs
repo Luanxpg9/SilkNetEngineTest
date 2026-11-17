@@ -41,15 +41,16 @@ sealed class Player(Vector2 position)
             Angle = MathF.Atan2(toTarget.Y, toTarget.X);
     }
 
-    // Row-vector order: scale the unit quad, turn it, then move it into place.
-    public Matrix4x4 BodyModel(Vector2 at) =>
-        Matrix4x4.CreateScale(Size, Size, 1f) * Matrix4x4.CreateRotationZ(Angle) * Matrix4x4.CreateTranslation(at.X, at.Y, 0f);
+    /// <summary>
+    /// The body, and a small bar sticking out of the front edge so you can see which way the player
+    /// faces. Both turn by <see cref="Angle"/>. The bar's center sits half a body ahead of the player's
+    /// center along the facing direction, which is the offset (Size / 2, 0) turned by the angle.
+    /// </summary>
+    public void Draw(SpriteBatch sprites, Vector2 at)
+    {
+        sprites.Draw(new Rect(at, new Vector2(Size)), BodyColor, Angle);
 
-    // A small bar sticking out of the front edge, so you can see which way the player faces.
-    // It's placed along +X before the turn, so it ends up on whichever side Angle points to.
-    public Matrix4x4 NoseModel(Vector2 at) =>
-        Matrix4x4.CreateScale(Size * 0.45f, Size * 0.22f, 1f)
-        * Matrix4x4.CreateTranslation(Size * 0.5f, 0f, 0f)
-        * Matrix4x4.CreateRotationZ(Angle)
-        * Matrix4x4.CreateTranslation(at.X, at.Y, 0f);
+        var facing = new Vector2(MathF.Cos(Angle), MathF.Sin(Angle));
+        sprites.Draw(new Rect(at + facing * (Size * 0.5f), new Vector2(Size * 0.45f, Size * 0.22f)), NoseColor, Angle);
+    }
 }

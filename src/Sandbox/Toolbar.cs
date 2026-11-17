@@ -53,47 +53,47 @@ static class Toolbar
 
     /// <summary>
     /// The panel, one button per tool with its icon, and the gravity toggle while the Rectangle tool
-    /// is selected. Uses whatever view-projection is set, so call it during the UI pass.
+    /// is selected. Call it inside the UI pass (<c>Sprites.Begin(ScreenProjection)</c>).
     /// </summary>
-    public static void Draw(QuadRenderer quads, float windowHeight, Vector2 mouse, Tool selected, bool placeWithGravity)
+    public static void Draw(SpriteBatch sprites, float windowHeight, Vector2 mouse, Tool selected, bool placeWithGravity)
     {
-        quads.Draw(new Rect(Center: new(Width / 2f, windowHeight / 2f), Size: new(Width, windowHeight)), PanelColor);
+        sprites.Draw(new Rect(Center: new(Width / 2f, windowHeight / 2f), Size: new(Width, windowHeight)), PanelColor);
 
         for (int i = 0; i < Tools.Length; i++)
         {
             var tool = Tools[i];
             var button = Slot(i);
-            quads.Draw(button, tool == selected ? SelectedColor : button.Contains(mouse) ? HoveredColor : ButtonColor);
-            DrawIcon(quads, tool, button);
+            sprites.Draw(button, tool == selected ? SelectedColor : button.Contains(mouse) ? HoveredColor : ButtonColor);
+            DrawIcon(sprites, tool, button);
         }
 
         if (selected == Tool.Rectangle)
         {
             // On (green): placed rectangles fall. Off: they stay where they're placed.
             var toggle = GravityToggle;
-            quads.Draw(toggle, placeWithGravity ? GravityOnColor : toggle.Contains(mouse) ? HoveredColor : ButtonColor);
-            DrawGravityArrow(quads, toggle, placeWithGravity ? ArrowOnColor : ArrowOffColor);
+            sprites.Draw(toggle, placeWithGravity ? GravityOnColor : toggle.Contains(mouse) ? HoveredColor : ButtonColor);
+            DrawGravityArrow(sprites, toggle, placeWithGravity ? ArrowOnColor : ArrowOffColor);
         }
     }
 
     // What goes on a tool's button. Icons are built from rectangles, so no textures are needed yet.
-    private static void DrawIcon(QuadRenderer quads, Tool tool, Rect button)
+    private static void DrawIcon(SpriteBatch sprites, Tool tool, Rect button)
     {
         switch (tool)
         {
             case Tool.Rectangle:
-                quads.Draw(button with { Size = new(28f, 18f) }, RectangleIconColor);
+                sprites.Draw(button with { Size = new(28f, 18f) }, RectangleIconColor);
                 break;
         }
     }
 
     // A downward arrow: a stem, then a head made of bars that narrow toward the tip.
-    private static void DrawGravityArrow(QuadRenderer quads, Rect button, Color color)
+    private static void DrawGravityArrow(SpriteBatch sprites, Rect button, Color color)
     {
         var c = button.Center; // y points down in window pixels
-        quads.Draw(new Rect(new(c.X, c.Y - 6f), new(6f, 16f)), color);
-        quads.Draw(new Rect(new(c.X, c.Y + 4f), new(18f, 4f)), color);
-        quads.Draw(new Rect(new(c.X, c.Y + 8f), new(12f, 4f)), color);
-        quads.Draw(new Rect(new(c.X, c.Y + 12f), new(6f, 4f)), color);
+        sprites.Draw(new Rect(new(c.X, c.Y - 6f), new(6f, 16f)), color);
+        sprites.Draw(new Rect(new(c.X, c.Y + 4f), new(18f, 4f)), color);
+        sprites.Draw(new Rect(new(c.X, c.Y + 8f), new(12f, 4f)), color);
+        sprites.Draw(new Rect(new(c.X, c.Y + 12f), new(6f, 4f)), color);
     }
 }

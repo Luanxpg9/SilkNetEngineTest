@@ -8,7 +8,7 @@ namespace Engine;
 
 /// <summary>
 /// The base class for a game or app made with the engine. It owns the window, the OpenGL context,
-/// <see cref="Input"/> and a <see cref="QuadRenderer"/>, and runs the main loop. A game derives from
+/// <see cref="Input"/> and a <see cref="SpriteBatch"/>, and runs the main loop. A game derives from
 /// it, overrides the methods it needs, and calls <see cref="Run"/>:
 /// <code>new MyGame().Run();</code>
 ///
@@ -37,11 +37,15 @@ public abstract class Game
 
     protected Game(string title, int width = 1280, int height = 720)
     {
+        var flags = ContextFlags.ForwardCompatible;
+#if DEBUG
+        flags |= ContextFlags.Debug; // a debug context, so the driver reports errors (see GLDebug)
+#endif
         var options = WindowOptions.Default with
         {
             Size = new Vector2D<int>(width, height),
             Title = title,
-            API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, ContextFlags.ForwardCompatible, new APIVersion(3, 3)),
+            API = new GraphicsAPI(ContextAPI.OpenGL, ContextProfile.Core, flags, new APIVersion(3, 3)),
         };
 
         _window = Window.Create(options);
@@ -55,7 +59,7 @@ public abstract class Game
     // These exist from Load on: the GL context is only created once the window is running.
     public GL GL { get; private set; } = null!;
     public Input Input { get; private set; } = null!;
-    public QuadRenderer Quads { get; private set; } = null!;
+    public SpriteBatch Sprites { get; private set; } = null!;
 
     /// <summary>Seconds per <see cref="FixedUpdate"/>. Set it in the constructor to change it.</summary>
     public float FixedTimeStep { get; protected set; } = 1f / 60f;
@@ -93,7 +97,7 @@ public abstract class Game
     /// <summary>Closes the window after this frame; <see cref="Unload"/> runs first.</summary>
     public void Exit() => _window.Close();
 
-    /// <summary>Create GL resources and set up the game. GL, Input and Quads are ready.</summary>
+    /// <summary>Create GL resources and set up the game. GL, Input and Sprites are ready.</summary>
     protected virtual void Load() { }
 
     /// <summary>Simulation at a constant rate: <paramref name="step"/> is always <see cref="FixedTimeStep"/>.</summary>
@@ -116,9 +120,12 @@ public abstract class Game
         GL = _window.CreateOpenGL();
         _inputContext = _window.CreateInput();
         Input = new Input(_inputContext, _window);
-        Quads = new QuadRenderer(GL);
 
         Log.Info($"OpenGL {GL.GetStringS(StringName.Version)} on {GL.GetStringS(StringName.Renderer)}");
+#if DEBUG
+        GLDebug.Enable(GL); // before anything else, so errors in the engine's own setup show up too
+#endif
+        Sprites = new SpriteBatch(GL);
 
         Load();
         if (FramebufferSize.Y > 0f)
@@ -151,6 +158,7 @@ public abstract class Game
     {
         GL.ClearColor(ClearColor.R, ClearColor.G, ClearColor.B, ClearColor.A);
         GL.Clear(ClearBufferMask.ColorBufferBit);
+        Sprites.ResetFrameStats();
         Draw();
     }
 
@@ -164,7 +172,7 @@ public abstract class Game
     private void OnClosing()
     {
         Unload();
-        Quads.Dispose();
+        Sprites.Dispose();
         _inputContext?.Dispose();
         GL.Dispose();
     }

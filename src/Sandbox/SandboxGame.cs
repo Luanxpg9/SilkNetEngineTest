@@ -114,18 +114,18 @@ sealed class SandboxGame() : Game("HavingFunWithEngine - Sandbox")
 
     protected override void Draw()
     {
-        Quads.Begin();
-
         // The scene, through the camera.
-        Quads.SetViewProjection(_camera.ViewProjection);
+        Sprites.Begin(_camera.ViewProjection);
         foreach (var body in _bodies)
-            Quads.Draw(body.Model, body.Color);
+            Sprites.Draw(new Rect(body.Position, body.Size), body.Color, body.Angle);
 
         if (_dragStart is Vector2 start)
-            Quads.Draw(Rect.FromCorners(start, Input.MouseWorldPosition(_camera)), PreviewColor);
+            Sprites.Draw(Rect.FromCorners(start, Input.MouseWorldPosition(_camera)), PreviewColor);
+        Sprites.End();
 
         // The UI, drawn last so it sits on top, in window units so the camera doesn't move it.
-        Quads.SetViewProjection(ScreenProjection);
-        Toolbar.Draw(Quads, WindowSize.Y, Input.MousePosition, _selectedTool, _placeWithGravity);
+        Sprites.Begin(ScreenProjection);
+        Toolbar.Draw(Sprites, WindowSize.Y, Input.MousePosition, _selectedTool, _placeWithGravity);
+        Sprites.End();
     }
 }
