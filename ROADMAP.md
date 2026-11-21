@@ -89,13 +89,24 @@ Built on Phase A; mostly bookkeeping on top of the batcher, plus the game's firs
 **Done when:** the soldier walks with an animation, aims the M16 at the mouse with the laser beam showing where it points, and the rifle's details are readable in game.
 
 ### 4. Entities
+
+#### Phase A: entities and the scene
+The engine side: a home for game objects, so games stop keeping their own lists and update order.
 - [ ] Plain C# game objects with `Update` / `Draw`, owned by a scene (no ECS for now)
 - [ ] Smooth motion for every entity: the base holds `Position` and `PreviousPosition`, the scene copies one into the other for all entities at the start of each fixed step (as `Player.BeginFixedStep` does now), and spawning or teleporting sets both, so a new bullet doesn't slide in from (0, 0)
 - [ ] Spawn and destroy queues, so objects can be added or removed safely during an update
 - [ ] Finding objects by type or tag
+- [ ] Move the shooter's player and enemy onto entities in a scene, behaving exactly as before
+
+**Done when:** the shooter looks and plays exactly as before, with the player and enemy living in a scene instead of fields on the game.
+
+#### Phase B: bullets
+The first thing that spawns and dies during play, using only what Phase A provides.
 - [ ] Shooter: the player fires bullets toward the mouse; bullets disappear after a while. Aim again in `FixedUpdate` from the real `Position` right before firing, so bullets leave along the laser line
 - [ ] Additive glow in `SpriteBatch`: an option that adds a sprite's light to what's under it instead of covering it, for tracers, muzzle flashes and the laser glow. With premultiplied alpha it's a color whose alpha is lowered (down to 0 for pure light), so it stays in the same batch
 - [ ] If F3 shows many draw calls once bullets and entities are in: upload all of a pass's sprites once and draw each texture run with `DrawElementsBaseVertex`, instead of one buffer upload per run
+
+**Done when:** clicking fires glowing bullets that leave along the laser line, move smoothly from the first frame, and disappear after a while.
 
 ### 5. Top-down collision
 - [ ] Circle and axis-aligned box shapes, with circle-circle, box-box and circle-box tests
