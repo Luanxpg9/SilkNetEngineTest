@@ -24,12 +24,18 @@ sealed class Player(Art art, Vector2 position, Vector2 arenaHalfSize) : Entity(p
     private static readonly Vector2 BodyCenterPixel = new(256f, 256f);    // in soldier_base/top.png
     private static readonly Vector2 RifleButtPixel = new(16f, 64f);       // in rifle.png
     private static readonly Vector2 LaserAperturePixel = new(604f, 40f);  // in rifle.png
+    private static readonly Vector2 MuzzlePixel = new(748f, 64f);         // in rifle.png: the end of the flash hider
 
     // The same points as offsets from the soldier's center, in world units, with the soldier facing +X.
     // The rifle butt sits in the right shoulder (soldier pixel 320, 304); y is negative because the
     // soldier's right side is below the center line.
     private static readonly Vector2 RifleOffset = Art.Offset(320f, 304f, BodyCenterPixel.X, BodyCenterPixel.Y);
     private static readonly Vector2 LaserOffset = RifleOffset + Art.Offset(LaserAperturePixel.X, LaserAperturePixel.Y, RifleButtPixel.X, RifleButtPixel.Y);
+    private static readonly Vector2 MuzzleOffset = RifleOffset + Art.Offset(MuzzlePixel.X, MuzzlePixel.Y, RifleButtPixel.X, RifleButtPixel.Y);
+
+    // Closer than this ahead of the muzzle (the cursor on the rifle itself), bullets fly straight
+    // along the rifle instead of toward the aim point.
+    private const float MinAimDistance = 0.5f; // world units
 
     private static readonly Color BeamGlowColor = Color.FromHex("#FF2A1A").WithAlpha(0.12f);
     private static readonly Color BeamCoreColor = Color.FromHex("#FF4A3A").WithAlpha(0.55f);
@@ -43,8 +49,8 @@ sealed class Player(Art art, Vector2 position, Vector2 arenaHalfSize) : Entity(p
     private float _walkTime; // seconds into the walk animation; runs backwards when walking backwards
     private float _legsAngle;
 
-    // Held keys (IsDown) drive movement. WasPressed works here too (each press reaches exactly one
-    // fixed step), which is what firing will use.
+    // Held keys (IsDown) drive movement. Firing uses WasPressed, which works here too: each click
+    // reaches exactly one fixed step, so one click is one shot, whatever the frame rate.
     protected override void FixedUpdate(float step)
     {
         var input = Game.Input;
@@ -60,6 +66,40 @@ sealed class Player(Art art, Vector2 position, Vector2 arenaHalfSize) : Entity(p
         // where it really ended up.
         var limit = arenaHalfSize - new Vector2(Size / 2f);
         Position = Vector2.Clamp(Position, -limit, limit);
+
+        // After moving, so the bullet leaves from where the rifle is at the end of this step.
+        if (input.WasPressed(MouseButton.Left))
+            Fire(step);
+    }
+
+    /// <summary>
+    /// Fires one round (semi-automatic: one per click). <see cref="Angle"/> was last set in
+    /// <see cref="Update"/>, from the drawn position and up to a frame ago, so it aims again from the
+    /// real <see cref="Entity.Position"/> first. The bullet starts at the muzzle and flies at the aim
+    /// point, so it crosses the laser dot: the barrel sits a few centimeters right of the laser, and
+    /// flying straight along <see cref="Angle"/> would pass beside the dot.
+    ///
+    /// The muzzle is worked out from the real position, which is up to one step of walking (about
+    /// 0.08 units) ahead of where the soldier is drawn. So while walking, the bullet's first frame can
+    /// sit that far ahead of the drawn muzzle, and after that it outruns the rifle at 30 units per
+    /// second. That's too small to see.
+    /// </summary>
+    private void Fire(float step)
+    {
+        FaceTowards(AimPoint, from: Position);
+        var muzzleAt = Position + MathHelpers.Rotate(MuzzleOffset, Angle);
+
+        var facing = MathHelpers.FromAngle(Angle);
+        var toAim = AimPoint - muzzleAt;
+        var direction = Vector2.Dot(toAim, facing) > MinAimDistance ? toAim : facing;
+
+        // Mid-pass, so the scene queues it: it joins when this fixed step ends and its own
+        // FixedUpdate first runs in the next one. Spawning sets both its positions to the muzzle,
+        // so on its own it would stand still there until then, up to a whole step. Advancing it by
+        // this step now keeps PreviousPosition at the muzzle, so from its first frame it's drawn
+        // sliding out of the muzzle at full speed.
+        var bullet = Scene!.Spawn(new Bullet(art, muzzleAt, direction));
+        bullet.Advance(step);
     }
 
     // Per frame, from where the soldier is drawn: aim, then animate.
@@ -150,8 +190,9 @@ sealed class Player(Art art, Vector2 position, Vector2 arenaHalfSize) : Entity(p
         if (Vector2.Dot(AimPoint - laserAt, facing) <= 0f)
             return;
 
-        sprites.DrawLine(laserAt, AimPoint, BeamGlowWidth, BeamGlowColor, Layers.Effects);
+        // The glow and the dot are pure light: they brighten what's under them instead of tinting it.
+        sprites.DrawLine(laserAt, AimPoint, BeamGlowWidth, BeamGlowColor, Layers.Effects, glow: 1f);
         sprites.DrawLine(laserAt, AimPoint, BeamCoreWidth, BeamCoreColor, Layers.Effects);
-        sprites.Draw(art.LaserDot, AimPoint, new Vector2(LaserDotSize), Color.White, layer: Layers.Effects);
+        sprites.Draw(art.LaserDot, AimPoint, new Vector2(LaserDotSize), Color.White, layer: Layers.Effects, glow: 1f);
     }
 }

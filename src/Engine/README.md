@@ -98,6 +98,12 @@ Sprites.Draw(walk.FrameAt(_walkTime), position, size, Color.White, rotation: ang
 
 Every `Draw` takes a `layer` (default 0). Higher layers cover lower ones, whatever order the calls come in, so a game can name its layers (floor, bodies, weapons, effects) and draw things in any order. Within a layer, later calls are on top. `DrawLine(from, to, thickness, color, layer)` draws a flat line, like a laser beam.
 
+Every `Draw` also takes a `glow` from 0 to 1. A glowing sprite adds its light to what's under it instead of covering it, so it can only brighten: `glow: 1f` is pure light, right for tracers, muzzle flashes and a laser's glow. Glowing and normal sprites share batches, so glow costs no extra draw calls:
+
+```csharp
+Sprites.Draw(tracer, position, size, Color.White, angle, layer: Layers.Effects, glow: 1f);
+```
+
 `Sprites.DrawCalls` and `Sprites.SpritesDrawn` count this frame's work. Read them in `Update` to get the numbers for the whole previous frame.
 
 ### Entities and the scene
@@ -184,6 +190,7 @@ The default is `LogLevel.Info`, so everything shows. An interpolated message (`$
    - **Regions (`TextureRegion`).** A rectangle of a texture in texture coordinates (`UvMin`, `UvMax`). `FromPixels` converts from image-editor pixels (y down from the top) to texture coordinates (v up from the bottom, since the image was flipped). `Grid` cuts a sheet into equal cells in reading order. Filtering and mipmaps average neighboring pixels, so each frame needs transparent space around it inside its cell, or it picks up a sliver of the next frame.
    - **Size limit and cleanup.** The constructor checks the GPU's maximum texture size and throws a clear error for an image that's too big, instead of letting it draw black. `Dispose` deletes the texture only once, because OpenGL reuses texture names and a second delete could hit an unrelated texture.
    - **Premultiplied alpha.** Red, green and blue are multiplied by alpha when the image loads, so a fully transparent pixel really is (0, 0, 0, 0). With plain alpha it would keep a color (often black) that linear filtering mixes into the visible pixels beside it: a dark outline around every sprite. The batcher blends with `One, OneMinusSrcAlpha`, the matching "over" operation, and premultiplies the tint the same way.
+   - **Glow from the same blend.** That blend is `source + destination × (1 − source alpha)`. Alpha only decides how much of the destination is kept; the source's color is added either way. So a sprite whose alpha is lowered while its color stays covers less and adds the same light: at alpha 0 it's pure addition. `glow` does exactly that to the tint, after premultiplying it: alpha × (1 − glow). No blend mode changes, so glowing sprites sit in the same batch as everything else.
 7. **Animation (`Animation`).** A list of regions and a frame duration. `FrameIndexAt(time)` is `floor(time / duration)`, wrapped around for looping animations (negative times too, so a cycle can play backwards) or held on the last frame otherwise. It keeps no time of its own, so many characters can share one animation, each at its own point.
 8. **GL error reporting (`GLDebug`).** In Debug builds, `Game` asks for a debug context and registers a callback through `KHR_debug` (core in GL 4.3, an extension on most drivers under 3.3). The driver then reports wrong calls the moment they happen: errors as `Log.Error`, performance and other warnings as `Log.Warning`. Messages are synchronous, so a breakpoint in the callback shows the guilty call on the stack. The callback delegate is kept in a static field, because the driver holds a pointer to it and the garbage collector would otherwise free it. Plain notifications and NVIDIA's harmless "shader recompiled" note are skipped. Release builds skip all of it, since the checks cost time.
 

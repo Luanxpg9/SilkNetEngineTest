@@ -4,14 +4,14 @@ using Silk.NET.Input;
 
 /// <summary>
 /// The top-down shooter. So far: a soldier who walks around a checkered arena with WASD, aims an
-/// M16A4 at the mouse with a laser showing where it points, and is followed by the camera. A crate
-/// stands in the arena, and enemies spawn along the walls and walk at the player, disappearing when
-/// they reach them; K removes them all. F3 logs how many sprites, draw calls and entities the last
-/// frame had.
+/// M16A4 at the mouse with a laser showing where it points, fires glowing tracers with a click, and
+/// is followed by the camera. A crate stands in the arena, and enemies spawn along the walls and
+/// walk at the player, disappearing when they reach them; K removes them all. F3 logs how many
+/// sprites, draw calls and entities the last frame had.
 ///
-/// The player, the enemies and the spawner are entities in a <see cref="Scene"/>, which runs them. The
-/// game keeps a handle to the player for what only the game knows about: the camera and the mouse
-/// in world units.
+/// The player, the enemies, the spawner and the bullets are entities in a <see cref="Scene"/>, which
+/// runs them. The game keeps a handle to the player for what only the game knows about: the camera
+/// and the mouse in world units.
 /// </summary>
 sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
 {
