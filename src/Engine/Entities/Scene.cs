@@ -28,6 +28,13 @@ public sealed class Scene(Game game)
     public int Count { get; private set; }
 
     /// <summary>
+    /// The scene's colliders. An entity's <see cref="Entity.Collider"/> joins it when the entity is
+    /// spawned (so queries see it at once, like the finds) and leaves when the destroyed entity is
+    /// removed. Add colliders that aren't entities, like walls, yourself.
+    /// </summary>
+    public CollisionWorld Collision { get; } = new();
+
+    /// <summary>
     /// Adds <paramref name="entity"/> to the scene and returns it. Its <see cref="Entity.PreviousPosition"/>
     /// is set to its <see cref="Entity.Position"/>, so it appears where it is instead of sliding in.
     /// During a pass it joins when the pass ends; until then the finds already see it, but it isn't run.
@@ -44,6 +51,8 @@ public sealed class Scene(Game game)
 
         entity.Scene = this;
         entity.PreviousPosition = entity.Position;
+        if (entity.Collider is { } collider)
+            Collision.Add(collider);
         _spawnQueue.Add(entity);
         if (!_inPass)
             ApplyChanges();
@@ -70,8 +79,10 @@ public sealed class Scene(Game game)
 
     /// <summary>
     /// One fixed step: first every entity's <see cref="Entity.PreviousPosition"/> becomes its
-    /// <see cref="Entity.Position"/>, then each runs its <see cref="Entity.FixedUpdate"/>. Anything
-    /// the game moves after this call, in the same fixed step, is still part of the smooth blend.
+    /// <see cref="Entity.Position"/>, then each runs its <see cref="Entity.FixedUpdate"/>, and then,
+    /// with everything moved, trigger overlaps that began or ended are reported
+    /// (<see cref="Entity.TriggerEnter"/>). Anything the game moves after this call, in the same fixed
+    /// step, is still part of the smooth blend.
     /// </summary>
     public void FixedUpdate(float step)
     {
@@ -84,6 +95,9 @@ public sealed class Scene(Game game)
             for (int i = 0; i < _entities.Count; i++)
                 if (!_entities[i].IsDestroyed)
                     _entities[i].FixedUpdate(step);
+
+            // Still inside the pass, so entities can destroy or spawn in their trigger events.
+            Collision.UpdateTriggers();
         }
         finally { EndPass(); }
     }
@@ -188,7 +202,7 @@ public sealed class Scene(Game game)
             {
                 if (!entity.IsDestroyed)
                     return false;
-                entity.Scene = null;
+                Leave(entity);
                 return true;
             });
             _anyDestroyed = false;
@@ -197,11 +211,19 @@ public sealed class Scene(Game game)
         foreach (var entity in _spawnQueue)
         {
             if (entity.IsDestroyed)
-                entity.Scene = null;
+                Leave(entity);
             else
                 _entities.Add(entity);
         }
         _spawnQueue.Clear();
         Count = _entities.Count;
+    }
+
+    // A destroyed entity leaves the scene, and its collider leaves the collision world.
+    private static void Leave(Entity entity)
+    {
+        if (entity.Collider is { } collider)
+            collider.World?.Remove(collider);
+        entity.Scene = null;
     }
 }
