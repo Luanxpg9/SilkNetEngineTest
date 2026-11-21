@@ -15,7 +15,7 @@ static class Layers
     public const int Bodies = 30;   // torsos and arms
     public const int Weapons = 40;  // the player's rifle, over the arms (so it can recoil on its own later)
     public const int BodyTops = 45; // helmet and gloves, over the rifle: cheek on the stock, fingers around the grip
-    public const int Effects = 50;  // laser beam, later muzzle flashes and tracers
+    public const int Effects = 50;  // laser beam and tracers, later muzzle flashes
 }
 
 /// <summary>
@@ -36,7 +36,7 @@ sealed class Art : IDisposable
     public Texture Rifle { get; }
     public Texture Legs { get; }         // walk cycle sheet: 8 frames of 768x512 side by side
     public Texture Enemy { get; }
-    public Texture Bullet { get; }       // not used until bullets exist (roadmap step 4 Phase B)
+    public Texture Bullet { get; }       // a tracer, pointing right
     public Texture LaserDot { get; }
 
     public Animation Walk { get; }

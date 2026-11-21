@@ -260,8 +260,13 @@ public sealed class SpriteBatch : IDisposable
     /// <paramref name="position"/> and that it turns around, from (0, 0) at the bottom left to (1, 1)
     /// at the top right; by default the center. <paramref name="rotation"/> is in radians,
     /// counter-clockwise. Higher <paramref name="layer"/>s are drawn on top.
+    ///
+    /// <paramref name="glow"/>, from 0 to 1, makes the sprite add its light to what's under it instead
+    /// of covering it: 0 is a normal sprite, 1 is pure light (a tracer, a muzzle flash, a laser's glow),
+    /// which brightens the floor under it and never darkens it. It doesn't change how bright the
+    /// sprite is, only how much it covers, and glowing sprites batch with normal ones (see the README).
     /// </summary>
-    public void Draw(TextureRegion region, Vector2 position, Vector2 size, Color tint, float rotation = 0f, Vector2? origin = null, int layer = 0)
+    public void Draw(TextureRegion region, Vector2 position, Vector2 size, Color tint, float rotation = 0f, Vector2? origin = null, int layer = 0, float glow = 0f)
     {
         if (!_begun)
             throw new InvalidOperationException("SpriteBatch.Draw was called outside Begin/End");
@@ -280,8 +285,10 @@ public sealed class SpriteBatch : IDisposable
         float cos = MathF.Cos(rotation), sin = MathF.Sin(rotation);
         Vector2 Corner(float x, float y) => position + new Vector2(x * cos - y * sin, x * sin + y * cos);
 
-        // Premultiply the tint so it blends the same way as the texture.
-        var color = new Vector4(tint.R * tint.A, tint.G * tint.A, tint.B * tint.A, tint.A);
+        // Premultiply the tint so it blends the same way as the texture. Then glow lowers only the
+        // alpha: the blend is source + destination × (1 − source alpha), so with alpha 0 the
+        // destination stays whole and the sprite's color is simply added on top.
+        var color = new Vector4(tint.R * tint.A, tint.G * tint.A, tint.B * tint.A, tint.A * (1f - Math.Clamp(glow, 0f, 1f)));
 
         // Corner order matches the index pattern: bottom left, bottom right, top right, top left.
         var uv0 = region.UvMin;
@@ -298,16 +305,16 @@ public sealed class SpriteBatch : IDisposable
     }
 
     /// <summary>A flat-colored rectangle, turned by <paramref name="rotation"/> radians around its center.</summary>
-    public void Draw(Rect rect, Color color, float rotation = 0f, int layer = 0) =>
-        Draw(WhitePixel, rect.Center, rect.Size, color, rotation, layer: layer);
+    public void Draw(Rect rect, Color color, float rotation = 0f, int layer = 0, float glow = 0f) =>
+        Draw(WhitePixel, rect.Center, rect.Size, color, rotation, layer: layer, glow: glow);
 
     /// <summary>A flat-colored line from <paramref name="from"/> to <paramref name="to"/>, <paramref name="thickness"/> wide.</summary>
-    public void DrawLine(Vector2 from, Vector2 to, float thickness, Color color, int layer = 0)
+    public void DrawLine(Vector2 from, Vector2 to, float thickness, Color color, int layer = 0, float glow = 0f)
     {
         // A rectangle whose left-middle point sits at `from`, as long as the line, turned toward `to`.
         var delta = to - from;
         Draw(WhitePixel, from, new Vector2(delta.Length(), thickness), color,
-            rotation: MathF.Atan2(delta.Y, delta.X), origin: new Vector2(0f, 0.5f), layer: layer);
+            rotation: MathF.Atan2(delta.Y, delta.X), origin: new Vector2(0f, 0.5f), layer: layer, glow: glow);
     }
 
     private void Grow()

@@ -103,9 +103,9 @@ The engine side: a home for game objects, so games stop keeping their own lists 
 
 #### Phase B: bullets
 The first thing that spawns and dies during play, using only what Phase A provides.
-- [ ] Shooter: the player fires bullets toward the mouse; bullets disappear after a while. Aim again in `FixedUpdate` from the real `Position` right before firing, so bullets leave along the laser line
-- [ ] Additive glow in `SpriteBatch`: an option that adds a sprite's light to what's under it instead of covering it, for tracers, muzzle flashes and the laser glow. With premultiplied alpha it's a color whose alpha is lowered (down to 0 for pure light), so it stays in the same batch
-- [ ] If F3 shows many draw calls once bullets and entities are in: upload all of a pass's sprites once and draw each texture run with `DrawElementsBaseVertex`, instead of one buffer upload per run
+- [x] Shooter: the player fires bullets toward the mouse; bullets disappear after a while. Aim again in `FixedUpdate` from the real `Position` right before firing, so bullets leave along the laser line
+- [x] Additive glow in `SpriteBatch`: an option that adds a sprite's light to what's under it instead of covering it, for tracers, muzzle flashes and the laser glow. With premultiplied alpha it's a color whose alpha is lowered (down to 0 for pure light), so it stays in the same batch
+- [x] If F3 shows many draw calls once bullets and entities are in: upload all of a pass's sprites once and draw each texture run with `DrawElementsBaseVertex`, instead of one buffer upload per run. Checked, and not needed yet: with about 10 bullets and a few enemies on screen, F3 shows 10 draw calls
 
 **Done when:** clicking fires glowing bullets that leave along the laser line, move smoothly from the first frame, and disappear after a while.
 
