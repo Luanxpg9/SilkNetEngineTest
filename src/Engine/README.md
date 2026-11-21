@@ -22,7 +22,7 @@ Everything is in the `Engine` namespace.
 | [`Rect.cs`](Rect.cs) | Axis-aligned rectangle: center and size only, for layout, hit testing and drawing |
 | [`Color.cs`](Color.cs) | RGBA color (0..1 per channel), with ready-made colors and hex codes like `#2B2D35` |
 
-The rigid-body box physics used to live here. It moved to [`src/Sandbox`](../Sandbox) in step 2.5, because games like the shooter don't use it; step 5 brings the engine's own top-down collision.
+The rigid-body box physics used to live here. It moved to [`src/Sandbox`](../Sandbox) in step 2.5, because games like the shooter don't use it; step 5 brings the engine's own 2D collision.
 
 Silk.NET packages (`Input`, `OpenGL`, `Windowing`, all 2.23.0) and `StbImageSharp` (image loading) are referenced here, and projects that reference the engine get them too.
 

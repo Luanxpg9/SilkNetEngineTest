@@ -2,7 +2,7 @@
 
 **Goal:** turn `src/Engine` into a small 2D engine that can be used to make 2D games. The first game built on it is a **top-down shooter** (`src/TopDownShooter`), and it decides what the engine needs next: every step below should end with something you can run.
 
-The engine stays generic: nothing specific to the shooter goes into `src/Engine`. Game-specific code lives in the game project.
+The engine stays generic: nothing specific to the shooter goes into `src/Engine`. Game-specific code lives in the game project. That goes for the kind of game too: what the shooter needs is built so any 2D game can use it, top-down or side view. Top-down conveniences can be added as helpers, but nothing in the engine assumes a top-down game.
 
 ## Projects
 
@@ -109,15 +109,31 @@ The first thing that spawns and dies during play, using only what Phase A provid
 
 **Done when:** clicking fires glowing bullets that leave along the laser line, move smoothly from the first frame, and disappear after a while.
 
-### 5. Top-down collision
-- [ ] Circle and axis-aligned box shapes, with circle-circle, box-box and circle-box tests
-- [ ] Collision layers and masks (player, enemy, bullet, wall)
-- [ ] Solid collisions (push out, slide along walls) vs. triggers (overlap events only)
-- [ ] A broad phase (uniform grid, like `src/Circles`) so hundreds of bullets stay cheap
-- [ ] Raycasts: cast a ray from a point in a direction, up to a maximum distance, and get the first shape it hits (which shape, where, how far), filtered by collision layers
-- [ ] Shooter: bullets hit enemies, enemies touch the player, nobody walks through walls
+### 5. 2D collision
+Collision for any 2D game, not only top-down ones: a platformer, a puzzle game or a side-scrolling shooter should be able to use it as it is. So it knows nothing about gravity, "up" or how the camera looks at the world. It answers two kinds of question: "what touches what, and how" (with a contact normal and depth, so a game can tell a floor from a wall if it cares), and "move this body this far, stopping at solid things". It doesn't apply forces or simulate rigid bodies; that stays in Sandbox, or a later physics step. Top-down conveniences are welcome as helpers on top, as long as the core doesn't depend on them.
+
+#### Phase A: shapes, queries and moving bodies
+The engine side, plus the first thing in the shooter that can't be walked through.
+- [ ] Shapes: circles and axis-aligned boxes, with circle-circle, box-box and circle-box tests that report whether they overlap and, if so, the contact normal and how deep they overlap
+- [ ] Colliders on entities: a shape with an offset from the entity's `Position`, solid or a trigger, and a layer plus a mask of layers it collides with. Layers are just bits (up to 32); each game names its own (the shooter's player, enemy, bullet and wall live in the shooter, not the engine)
+- [ ] A collision world that knows every collider in a scene, including static ones that aren't entities (walls)
+- [ ] Queries, filtered by layer mask: shapes overlapping a point, a circle or a box; and raycasts that return the first shape hit along a ray, up to a maximum distance (which collider, where, how far, and the surface normal there)
+- [ ] Moving a body: move a collider by a displacement, stop at solid colliders, and slide along them with the rest of the move. It returns every contact with its normal, so a platformer can check for ground under its feet and a top-down game can ignore which way walls face. It works with any velocity, with or without gravity
+- [ ] Triggers: overlaps that don't block, reported as begin and end events each fixed step
+- [ ] A debug view: a key that draws every collider's outline (solid, trigger and static in different colors), on top of the game
+- [ ] Shooter: the walls and the crate are solid, the player is a circle that slides along them, and the clamp in `Player` goes away
+
+**Done when:** the soldier can't walk through the walls or the crate and slides smoothly along them and around the crate's corners, and the debug view shows every collider lined up with its sprite.
+
+#### Phase B: hits, the laser and many bullets
+The shooter puts the collision world to work, and the engine gets fast enough for it.
+- [ ] A broad phase (a uniform grid, like `src/Circles`), so queries and moves only test nearby colliders and hundreds of bullets stay cheap. Shown with F3: the number of shape tests per frame stays low with many bullets in the air
+- [ ] Shooter: bullets hit enemies and disappear (enemies die in one hit for now), and bullets stop at walls and the crate. Fast bullets don't skip through thin things: a bullet raycasts along its move each step instead of only testing where it ends up
+- [ ] Shooter: enemies collide with walls, the crate and each other, and touching the player is detected with a trigger instead of the distance check in `Enemy`
 - [ ] Shooter: the laser no longer ends at the mouse. It's a raycast from the laser module along the rifle, and the beam and its dot stop at the first body it hits (enemy, wall, crate) or at the laser's maximum range, whichever comes first
 - [ ] Shooter: a laser beam that doesn't shimmer as it turns. Its core is about 1.4 screen pixels wide with hard edges; keep it at least 2 pixels wide, or draw it with a small texture that fades across its width instead of the flat white pixel
+
+**Done when:** shooting an enemy kills it, bullets stop at walls, enemies push around the crate and each other, the laser stops at whatever it points at, and F3 shows the collision cost staying low with a screen full of bullets.
 
 ### 6. Tilemap levels
 - [ ] Grid of tiles drawn from a tileset texture
@@ -130,7 +146,7 @@ The first thing that spawns and dies during play, using only what Phase A provid
 ### 7. Text and HUD
 - [ ] Bitmap font rendering through the sprite batcher
 - [ ] Screen-space UI pass (like the Sandbox toolbar) for health, ammo and score
-- [ ] Simple debug overlay: FPS, entity count, collision shapes
+- [ ] Simple debug overlay: FPS, entity count, and a switch for step 5's collider view
 
 ### 8. Audio
 - [ ] Load WAV / OGG sound effects and play them through OpenAL (Silk.NET.OpenAL)
@@ -147,4 +163,5 @@ The first thing that spawns and dies during play, using only what Phase A provid
 - Camera zoom and screen shake
 - Particles (muzzle flash, hit sparks)
 - Gamepad input
+- More collision shapes (rotated boxes, capsules, polygons), and side-view helpers like one-way platforms and slopes, when a game needs them
 - Cloth simulation and physics extras in Sandbox (restitution, per-body friction, sleeping)
