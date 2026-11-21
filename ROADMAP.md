@@ -92,13 +92,14 @@ Built on Phase A; mostly bookkeeping on top of the batcher, plus the game's firs
 
 #### Phase A: entities and the scene
 The engine side: a home for game objects, so games stop keeping their own lists and update order.
-- [ ] Plain C# game objects with `Update` / `Draw`, owned by a scene (no ECS for now)
-- [ ] Smooth motion for every entity: the base holds `Position` and `PreviousPosition`, the scene copies one into the other for all entities at the start of each fixed step (as `Player.BeginFixedStep` does now), and spawning or teleporting sets both, so a new bullet doesn't slide in from (0, 0)
-- [ ] Spawn and destroy queues, so objects can be added or removed safely during an update
-- [ ] Finding objects by type or tag
-- [ ] Move the shooter's player and enemy onto entities in a scene, behaving exactly as before
+- [x] Plain C# game objects with `Update` / `Draw`, owned by a scene (no ECS for now)
+- [x] Smooth motion for every entity: the base holds `Position` and `PreviousPosition`, the scene copies one into the other for all entities at the start of each fixed step (as `Player.BeginFixedStep` used to), and spawning or teleporting sets both, so a new bullet doesn't slide in from (0, 0)
+- [x] Spawn and destroy queues, so objects can be added or removed safely during an update
+- [x] Finding objects by type or tag
+- [x] Move the shooter's player and enemy onto entities in a scene, behaving exactly as before
+- [x] A test of the scene in the shooter: enemies walk straight at the player at a fixed speed and disappear when they reach them, a spawner adds one along the walls every 1.5 s (up to 8), and `K` removes them all
 
-**Done when:** the shooter looks and plays exactly as before, with the player and enemy living in a scene instead of fields on the game.
+**Done when:** the player and enemies live in a scene instead of fields on the game, the player looks and plays exactly as before, and the enemy test shows spawning and destroying working mid-update (enemies arrive, vanish on reaching the player, and `K` clears them).
 
 #### Phase B: bullets
 The first thing that spawns and dies during play, using only what Phase A provides.

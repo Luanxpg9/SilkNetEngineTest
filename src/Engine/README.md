@@ -7,6 +7,8 @@ Everything is in the `Engine` namespace.
 | File | What it is |
 | --- | --- |
 | [`Game.cs`](Game.cs) | Base class for a game: window, GL context, main loop with a fixed step |
+| [`Entities/Entity.cs`](Entities/Entity.cs) | Base class for game objects: position with smooth blending between fixed steps, tag, overridable `FixedUpdate` / `Update` / `Draw` |
+| [`Entities/Scene.cs`](Entities/Scene.cs) | Owns and runs entities in spawn order; spawn and destroy safely mid-update; find by type or tag |
 | [`Input/Input.cs`](Input/Input.cs) | Keyboard and mouse state: held, pressed and released (per frame or per fixed step), mouse position |
 | [`MathHelpers.cs`](MathHelpers.cs) | Angle and vector helpers: wrap an angle, direction from an angle, rotate a vector, frame-rate independent smoothing |
 | [`Log.cs`](Log.cs) | Console logging with three levels (info, warning, error) that can be filtered or turned off |
@@ -98,6 +100,37 @@ Every `Draw` takes a `layer` (default 0). Higher layers cover lower ones, whatev
 
 `Sprites.DrawCalls` and `Sprites.SpritesDrawn` count this frame's work. Read them in `Update` to get the numbers for the whole previous frame.
 
+### Entities and the scene
+
+A game object derives from `Entity` and overrides what it needs. A `Scene` owns the entities and runs them; the game creates it in `Load` and calls it from its own methods:
+
+```csharp
+sealed class Ball(Vector2 position) : Entity(position)
+{
+    private Vector2 _velocity = new(2f, 0f);
+
+    protected override void FixedUpdate(float step)
+    {
+        Position += _velocity * step;
+        if (Game.Input.WasPressed(Key.Space))
+            Destroy();
+    }
+
+    protected override void Draw(SpriteBatch sprites) =>
+        sprites.Draw(new Rect(DrawPosition, new(0.5f, 0.5f)), Color.White);
+}
+
+// in the game:
+private Scene _scene = null!;
+protected override void Load() { _scene = new Scene(this); _scene.Spawn(new Ball(Vector2.Zero)); }
+protected override void FixedUpdate(float step) => _scene.FixedUpdate(step);
+protected override void Update(float deltaTime) => _scene.Update(deltaTime);
+// in Draw, between Sprites.Begin and Sprites.End:
+_scene.Draw(Sprites);
+```
+
+Move in `FixedUpdate` and draw at `DrawPosition`, and motion is smooth on any screen (see 10 below). `Teleport(to)` jumps without blending. `Destroy()` (or `scene.Destroy(entity)`) removes an entity; `scene.Spawn(entity)` adds one and returns it, so `var b = scene.Spawn(new Bullet(...))` works. Both are safe in the middle of an update. A destroyed entity stays destroyed (`IsDestroyed`) and can't be spawned again, so a reference to it never comes back to life; spawn a new one instead. `FindFirst<T>()` and `FindAll<T>(list)` find by type, `FindFirstWithTag(tag)` and `FindAllWithTag(tag, list)` by the optional `Tag`. The `FindAll` versions fill a list you pass in, so keep one between frames and finding doesn't allocate. Inside an entity, `Game` is the scene's game (for `Input`), and `Scene` is the scene.
+
 ### Logging
 
 `Log.Info`, `Log.Warning` and `Log.Error` write to the console as `[INFO ]`, `[WARN ]` (yellow) and `[ERROR]` (red, on the error stream). `Log.Level` hides everything below it, and `LogLevel.None` turns logging off. Set it before `Run()`:
@@ -155,6 +188,13 @@ The default is `LogLevel.Info`, so everything shows. An interpolated message (`$
 8. **GL error reporting (`GLDebug`).** In Debug builds, `Game` asks for a debug context and registers a callback through `KHR_debug` (core in GL 4.3, an extension on most drivers under 3.3). The driver then reports wrong calls the moment they happen: errors as `Log.Error`, performance and other warnings as `Log.Warning`. Messages are synchronous, so a breakpoint in the callback shows the guilty call on the stack. The callback delegate is kept in a static field, because the driver holds a pointer to it and the garbage collector would otherwise free it. Plain notifications and NVIDIA's harmless "shader recompiled" note are skipped. Release builds skip all of it, since the checks cost time.
 
 9. **Math helpers (`MathHelpers`).** `WrapAngle` brings an angle into -π..π, so the difference between two angles turns the short way round. `FromAngle` gives the unit vector `(cos, sin)`, `Rotate` turns a vector, which is handy for offsets defined on art facing +X (a muzzle, a laser) that must follow the sprite. `SmoothingFactor(rate, deltaTime)` is `1 - e^(-rate × deltaTime)`: moving that fraction of the way toward a target each frame follows with the same curve at any frame rate, where `rate × deltaTime` would overshoot on slow frames.
+
+10. **Entities and the scene (`Entity`, `Scene`).** Plain C# objects with virtual methods, owned by a list in the scene; no entity-component system for now.
+    - **Smooth motion.** Each entity has `Position` (after the latest fixed step) and `PreviousPosition` (after the one before). `Scene.FixedUpdate` copies one into the other for every entity first, then runs their `FixedUpdate`, so everything that moves an entity in the step, including whatever the game does after the call, is part of one blend. `DrawPosition` lerps between them by `Game.FixedStepAlpha`, read live from the game, so it's right in `Update` and `Draw` alike. Spawning and `Teleport` set both positions, so a new entity doesn't slide in from (0, 0).
+    - **Changes during a pass.** `FixedUpdate`, `Update` and `Draw` are passes over the list. Adding to or removing from a list while walking it would skip or repeat entities, so during a pass `Spawn` puts the entity in a queue and `Destroy` only sets `IsDestroyed`. A destroyed entity is skipped at once (not run, drawn or found again, even later in the same pass), and when the pass ends the scene removes destroyed entities (`RemoveAll`, which keeps the order of the rest) and appends the queue. Outside a pass, changes apply right away. Entities spawned mid-pass are already found by the finds, but they only start running in the next pass.
+    - **Order.** Entities run in spawn order. Drawing order is decided by sprite layers, not by the list.
+    - **Finding.** A straight walk over the list, testing `is T` or the tag. That's plenty for dozens of entities; an index by type can come later if a profile asks for it.
+    - **No allocations while running.** The lists only grow when they reach a new largest size, the removal predicate is a `static` lambda (created once), and the finds fill a list the caller keeps.
 
 > **Screen to world.** Mouse positions arrive in window pixels with y pointing down. `Camera2D.ScreenToWorld` turns them into normalized device coordinates (-1..1, y up), scales by half the visible size and adds the camera position. That's the inverse of the camera's matrices, worked out by hand because an orthographic camera makes it simple.
 
