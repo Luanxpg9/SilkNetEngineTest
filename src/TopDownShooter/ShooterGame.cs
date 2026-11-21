@@ -5,8 +5,13 @@ using Silk.NET.Input;
 /// <summary>
 /// The top-down shooter. So far: a soldier who walks around a checkered arena with WASD, aims an
 /// M16A4 at the mouse with a laser showing where it points, and is followed by the camera. A crate
-/// and an enemy (who only turns to watch) stand in the arena. F3 logs how many sprites and draw
-/// calls the last frame took.
+/// stands in the arena, and enemies spawn along the walls and walk at the player, disappearing when
+/// they reach them; K removes them all. F3 logs how many sprites, draw calls and entities the last
+/// frame had.
+///
+/// The player, the enemies and the spawner are entities in a <see cref="Scene"/>, which runs them. The
+/// game keeps a handle to the player for what only the game knows about: the camera and the mouse
+/// in world units.
 /// </summary>
 sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
 {
@@ -26,12 +31,18 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
     // Shows 8 world units vertically: room to see what's coming, with the soldier large enough
     // for the rifle's details to read.
     private readonly Camera2D _camera = new(viewHeight: 8f);
-    private readonly Player _player = new(position: Vector2.Zero);
-    private readonly Enemy _enemy = new(position: new Vector2(-5f, 3f));
-    private Art _art = null!;     // loaded in Load, once the GL context exists
-    private Vector2 _aimPoint;    // the mouse in world units, this frame
+    private Art _art = null!;       // loaded in Load, once the GL context exists
+    private Scene _scene = null!;   // created in Load: the entities need the art
+    private Player _player = null!; // also in _scene, which owns it
 
-    protected override void Load() => _art = new Art(GL);
+    protected override void Load()
+    {
+        _art = new Art(GL);
+        _scene = new Scene(this);
+        _player = _scene.Spawn(new Player(_art, position: Vector2.Zero, ArenaHalfSize));
+        _scene.Spawn(new Enemy(_art, position: new Vector2(-5f, 3f)));
+        _scene.Spawn(new EnemySpawner(_art, ArenaHalfSize)); // more enemies along the walls, K removes them
+    }
 
     protected override void Unload() => _art.Dispose();
 
@@ -40,21 +51,9 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
     // Simulation: movement belongs here, so it's identical at any frame rate.
     protected override void FixedUpdate(float step)
     {
-        // Remember where this step starts, before anything moves the player (see Player.DrawPosition).
-        _player.BeginFixedStep();
-
-        // Held keys (IsDown) drive movement. WasPressed works here too (each press reaches exactly one
-        // fixed step), which is what firing will use; Esc stays in Update because quitting isn't simulation.
-        Vector2 direction = Vector2.Zero;
-        if (Input.IsDown(Key.A) || Input.IsDown(Key.Left))  direction.X -= 1;
-        if (Input.IsDown(Key.D) || Input.IsDown(Key.Right)) direction.X += 1;
-        if (Input.IsDown(Key.S) || Input.IsDown(Key.Down))  direction.Y -= 1;
-        if (Input.IsDown(Key.W) || Input.IsDown(Key.Up))    direction.Y += 1;
-        _player.Move(direction, step);
-
-        // Keep the player inside the walls until real collision arrives (roadmap step 5).
-        var limit = ArenaHalfSize - new Vector2(Player.Size / 2f);
-        _player.Position = Vector2.Clamp(_player.Position, -limit, limit);
+        // Every entity's step starts where the last one ended, then each runs: the player walks
+        // (staying inside the walls), the enemies chase it, the spawner adds more.
+        _scene.FixedUpdate(step);
     }
 
     // Per frame: things that should follow the screen smoothly, and one-off input.
@@ -65,19 +64,16 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
 
         // Read during Update, so the numbers are from the whole previous frame.
         if (Input.WasPressed(Key.F3))
-            Log.Info($"Last frame: {Sprites.SpritesDrawn} sprites in {Sprites.DrawCalls} draw calls");
+            Log.Info($"Last frame: {Sprites.SpritesDrawn} sprites in {Sprites.DrawCalls} draw calls, {_scene.Count} entities");
 
         // The camera centers on where the player is drawn this frame, so the player stays still
         // on screen and the arena slides under it.
-        var playerAt = _player.DrawPosition(FixedStepAlpha);
-        _camera.Position = playerAt;
+        _camera.Position = _player.DrawPosition;
 
-        // Aim after moving the camera, so the mouse is converted to world units with this frame's view.
-        _aimPoint = Input.MouseWorldPosition(_camera);
-        _player.FaceTowards(_aimPoint, from: playerAt);
-        _player.Animate(deltaTime);
-
-        _enemy.FaceTowards(playerAt);
+        // After moving the camera, so the mouse is converted to world units with this frame's view.
+        // The player aims at it in its own Update.
+        _player.AimPoint = Input.MouseWorldPosition(_camera);
+        _scene.Update(deltaTime);
     }
 
     protected override void Draw()
@@ -88,8 +84,7 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
         // sprites with the same texture batch together (the 604 floor sprites are one draw call).
         DrawArena();
         Sprites.Draw(_art.Crate, CratePosition, CrateSize, Color.White, layer: Layers.Props);
-        _enemy.Draw(Sprites, _art);
-        _player.Draw(Sprites, _art, _player.DrawPosition(FixedStepAlpha), _aimPoint);
+        _scene.Draw(Sprites);
 
         Sprites.End();
     }

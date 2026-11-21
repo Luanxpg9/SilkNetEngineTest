@@ -36,7 +36,7 @@ sealed class Art : IDisposable
     public Texture Rifle { get; }
     public Texture Legs { get; }         // walk cycle sheet: 8 frames of 768x512 side by side
     public Texture Enemy { get; }
-    public Texture Bullet { get; }       // not used until bullets exist (roadmap step 4)
+    public Texture Bullet { get; }       // not used until bullets exist (roadmap step 4 Phase B)
     public Texture LaserDot { get; }
 
     public Animation Walk { get; }
