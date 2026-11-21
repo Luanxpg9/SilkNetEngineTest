@@ -4,8 +4,8 @@ A small 2D game engine built from scratch in C# with [Silk.NET](https://github.c
 
 | Project | What it is |
 | --- | --- |
-| [`src/Engine`](src/Engine) | The engine, a class library: game loop with a fixed step, input, logging, colors, 2D camera and quad rendering so far. |
-| [`src/TopDownShooter`](src/TopDownShooter) | The game being built on the engine. So far: walk around an arena with WASD and aim with the mouse. |
+| [`src/Engine`](src/Engine) | The engine, a class library: game loop with a fixed step, input, logging, 2D camera, batched sprites with textures, animation and glow, entities in a scene, and 2D collision (shapes, queries, raycasts, move and slide, with a grid broad phase) so far. |
+| [`src/TopDownShooter`](src/TopDownShooter) | The game being built on the engine. So far: walk around a walled arena with WASD, aim a laser with the mouse, and shoot enemies that chase you around the crate. |
 | [`src/Sandbox`](src/Sandbox) | A physics playground built on the engine, with its own rigid-body physics: place falling and fixed boxes with a toolbar and watch them tip, topple and stack. |
 | [`src/Circles`](src/Circles) | A side experiment: thousands of circles and sphere impostors drawn with one instanced draw call, with ball-to-ball collisions. |
 

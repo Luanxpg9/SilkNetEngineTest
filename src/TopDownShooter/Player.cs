@@ -33,13 +33,20 @@ sealed class Player : Entity
     private static readonly Vector2 LaserOffset = RifleOffset + Art.Offset(LaserAperturePixel.X, LaserAperturePixel.Y, RifleButtPixel.X, RifleButtPixel.Y);
     private static readonly Vector2 MuzzleOffset = RifleOffset + Art.Offset(MuzzlePixel.X, MuzzlePixel.Y, RifleButtPixel.X, RifleButtPixel.Y);
 
-    // Closer than this ahead of the muzzle (the cursor on the rifle itself), bullets fly straight
-    // along the rifle instead of toward the aim point.
+    // Closer than this ahead of the muzzle (the laser stopping on something touching the rifle),
+    // bullets fly straight along the rifle instead of toward the laser's dot.
     private const float MinAimDistance = 0.5f; // world units
+
+    // The laser stops at the first enemy, wall or crate along the rifle, or after this far.
+    private const float LaserRange = 25f; // world units: past the far corner of the arena
+    private const uint LaserMask = CollisionLayers.Enemy | CollisionLayers.Wall;
 
     private static readonly Color BeamGlowColor = Color.FromHex("#FF2A1A").WithAlpha(0.12f);
     private static readonly Color BeamCoreColor = Color.FromHex("#FF4A3A").WithAlpha(0.55f);
-    private const float BeamGlowWidth = 0.06f, BeamCoreWidth = 0.016f, LaserDotSize = 0.24f; // world units
+    // The core is 0.024 units wide: about 2.2 pixels at the shooter's zoom (90 pixels per unit). At
+    // 0.016 (1.4 pixels) its hard edges fell between pixels differently at each angle, and the
+    // beam shimmered as the soldier turned; 2 pixels or more always covers a full pixel row.
+    private const float BeamGlowWidth = 0.06f, BeamCoreWidth = 0.024f, LaserDotSize = 0.24f; // world units
 
     private const float LegsTurnRate = 14f; // how quickly the legs swing to a new walking direction (per second)
 
@@ -49,6 +56,11 @@ sealed class Player : Entity
     private readonly Art _art;
     private float _walkTime; // seconds into the walk animation; runs backwards when walking backwards
     private float _legsAngle;
+
+    // The laser beam this frame, from the drawn position: from the module to where it stops, and
+    // whether it stopped on something (only then is there a dot).
+    private Vector2 _laserStart, _laserEnd;
+    private bool _laserHits;
 
     public Player(Art art, Vector2 position) : base(position)
     {
@@ -82,9 +94,13 @@ sealed class Player : Entity
     /// <summary>
     /// Fires one round (semi-automatic: one per click). <see cref="Angle"/> was last set in
     /// <see cref="Update"/>, from the drawn position and up to a frame ago, so it aims again from the
-    /// real <see cref="Entity.Position"/> first. The bullet starts at the muzzle and flies at the aim
-    /// point, so it crosses the laser dot: the barrel sits a few centimeters right of the laser, and
-    /// flying straight along <see cref="Angle"/> would pass beside the dot.
+    /// real <see cref="Entity.Position"/> first. The bullet starts at the muzzle and flies at the point
+    /// where the laser stops, so it lands on the dot: the barrel sits a few centimeters right of the
+    /// laser, and flying straight along <see cref="Angle"/> would land beside it.
+    ///
+    /// The rifle reaches about 2 units ahead of the soldier's center, so standing against a wall
+    /// puts the muzzle on the other side of it. So first a ray runs from the shoulder to the muzzle:
+    /// if the rifle crosses a wall or an enemy, the shot hits that right away and no tracer flies.
     ///
     /// The muzzle is worked out from the real position, which is up to one step of walking (about
     /// 0.08 units) ahead of where the soldier is drawn. So while walking, the bullet's first frame can
@@ -94,11 +110,20 @@ sealed class Player : Entity
     private void Fire(float step)
     {
         FaceTowards(AimPoint, from: Position);
+        var facing = MathHelpers.FromAngle(Angle);
+        var shoulderAt = Position + MathHelpers.Rotate(RifleOffset, Angle);
         var muzzleAt = Position + MathHelpers.Rotate(MuzzleOffset, Angle);
 
-        var facing = MathHelpers.FromAngle(Angle);
-        var toAim = AimPoint - muzzleAt;
-        var direction = Vector2.Dot(toAim, facing) > MinAimDistance ? toAim : facing;
+        var alongRifle = muzzleAt - shoulderAt;
+        if (Scene!.Collision.Raycast(shoulderAt, alongRifle, alongRifle.Length(), Bullet.HitMask, out var blocked))
+        {
+            Bullet.Strike(blocked.Collider!);
+            return;
+        }
+
+        var target = CastLaser(Position, facing, out _);
+        var toTarget = target - muzzleAt;
+        var direction = Vector2.Dot(toTarget, facing) > MinAimDistance ? toTarget : facing;
 
         // Mid-pass, so the scene queues it: it joins when this fixed step ends and its own
         // FixedUpdate first runs in the next one. Spawning sets both its positions to the muzzle,
@@ -109,11 +134,28 @@ sealed class Player : Entity
         bullet.Advance(step);
     }
 
-    // Per frame, from where the soldier is drawn: aim, then animate.
+    // Per frame, from where the soldier is drawn: aim, cast the laser, then animate.
     protected override void Update(float deltaTime)
     {
-        FaceTowards(AimPoint, from: DrawPosition);
+        var at = DrawPosition;
+        FaceTowards(AimPoint, from: at);
+        _laserStart = at + MathHelpers.Rotate(LaserOffset, Angle);
+        _laserEnd = CastLaser(at, MathHelpers.FromAngle(Angle), out _laserHits);
         Animate(deltaTime);
+    }
+
+    /// <summary>
+    /// Where the laser stops with the soldier at <paramref name="at"/> facing <paramref name="facing"/>:
+    /// a ray from the laser module along the rifle, up to <see cref="LaserRange"/>, stopping at the
+    /// first enemy, wall or crate. <paramref name="hits"/> says whether it stopped on something.
+    /// The colliders are where the last fixed step left them, which is up to a step ahead of where
+    /// moving enemies are drawn: at their 2 units per second, at most 3 centimeters.
+    /// </summary>
+    private Vector2 CastLaser(Vector2 at, Vector2 facing, out bool hits)
+    {
+        var start = at + MathHelpers.Rotate(LaserOffset, Angle);
+        hits = Scene!.Collision.Raycast(start, facing, LaserRange, LaserMask, out var hit);
+        return hits ? hit.Point : start + facing * LaserRange;
     }
 
     /// <summary>
@@ -177,21 +219,17 @@ sealed class Player : Entity
 
         sprites.Draw(_art.SoldierTop, at, bodySize, Color.White, Angle, bodyOrigin, Layers.BodyTops);
 
-        DrawLaser(sprites, at);
+        DrawLaser(sprites);
     }
 
-    // A thin beam from the laser module to the aim point, with a soft glow around it and a dot where
-    // it lands. When the aim point is closer than the laser itself (mouse over the rifle), there's no beam.
-    private void DrawLaser(SpriteBatch sprites, Vector2 at)
+    // A thin beam from the laser module to where it stops (worked out in Update), with a soft glow
+    // around it, and a dot where it lands on something. A beam that runs out of range has no dot.
+    private void DrawLaser(SpriteBatch sprites)
     {
-        var laserAt = at + MathHelpers.Rotate(LaserOffset, Angle);
-        var facing = MathHelpers.FromAngle(Angle);
-        if (Vector2.Dot(AimPoint - laserAt, facing) <= 0f)
-            return;
-
         // The glow and the dot are pure light: they brighten what's under them instead of tinting it.
-        sprites.DrawLine(laserAt, AimPoint, BeamGlowWidth, BeamGlowColor, Layers.Effects, glow: 1f);
-        sprites.DrawLine(laserAt, AimPoint, BeamCoreWidth, BeamCoreColor, Layers.Effects);
-        sprites.Draw(_art.LaserDot, AimPoint, new Vector2(LaserDotSize), Color.White, layer: Layers.Effects, glow: 1f);
+        sprites.DrawLine(_laserStart, _laserEnd, BeamGlowWidth, BeamGlowColor, Layers.Effects, glow: 1f);
+        sprites.DrawLine(_laserStart, _laserEnd, BeamCoreWidth, BeamCoreColor, Layers.Effects);
+        if (_laserHits)
+            sprites.Draw(_art.LaserDot, _laserEnd, new Vector2(LaserDotSize), Color.White, layer: Layers.Effects, glow: 1f);
     }
 }
