@@ -21,8 +21,24 @@ public abstract class Entity
 
     protected Entity(Vector2 position) => Position = PreviousPosition = position;
 
-    /// <summary>Where the entity is after the latest fixed step, in world units.</summary>
-    public Vector2 Position { get; set; }
+    /// <summary>
+    /// Where the entity is after the latest fixed step, in world units. Setting it moves the
+    /// <see cref="Collider"/> too, and the collision world finds it at the new place at once. Setting
+    /// it is a jump, though: nothing stops it at walls; <see cref="MoveAndSlide"/> does that.
+    /// </summary>
+    public Vector2 Position
+    {
+        get => _position;
+        set
+        {
+            _position = value;
+            // Keep the world's grid filed by where the collider really is (cheap when it stays in its cells).
+            if (_collider?.World is { } world)
+                world.Moved(_collider);
+        }
+    }
+
+    private Vector2 _position;
 
     /// <summary>Where the entity was after the fixed step before the latest one.</summary>
     public Vector2 PreviousPosition { get; set; }

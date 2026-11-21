@@ -6,9 +6,10 @@ using Silk.NET.Input;
 /// The top-down shooter. So far: a soldier who walks around a checkered arena with WASD, aims an
 /// M16A4 at the mouse with a laser showing where it points, fires glowing tracers with a click, and
 /// is followed by the camera. The walls and a crate are solid, and the soldier slides along them.
-/// Enemies spawn along the walls and walk at the player, disappearing when they reach them; K
-/// removes them all. F2 shows the colliders, and F3 logs how many sprites, draw calls, entities and
-/// colliders the last frame had.
+/// Enemies spawn along the walls and walk at the player around obstacles and each other,
+/// disappearing when they reach them; a bullet kills one, and K removes them all. The laser stops at
+/// whatever it points at. F2 shows the colliders, and F3 logs how many sprites, draw calls,
+/// entities, colliders and shape tests the last frame had.
 ///
 /// The player, the enemies, the spawner and the bullets are entities in a <see cref="Scene"/>, which
 /// runs them. The game keeps a handle to the player for what only the game knows about: the camera
@@ -42,6 +43,7 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
     private Scene _scene = null!;   // created in Load: the entities need the art
     private Player _player = null!; // also in _scene, which owns it
     private bool _showColliders;    // F2
+    private int _shapeTestsLastFrame; // for F3: how much work the collision world did
 
     protected override void Load()
     {
@@ -67,8 +69,8 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
     protected override void FixedUpdate(float step)
     {
         // Every entity's step starts where the last one ended, then each runs: the player walks
-        // (sliding along the walls and the crate), the enemies chase it, the spawner adds more.
-        // Then enemies that reached the player find out through their triggers.
+        // (sliding along the walls and the crate), the enemies chase it and push around each other,
+        // bullets fly and hit, the spawner adds more.
         _scene.FixedUpdate(step);
     }
 
@@ -80,7 +82,8 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
 
         // Read during Update, so the numbers are from the whole previous frame.
         if (Input.WasPressed(Key.F3))
-            Log.Info($"Last frame: {Sprites.SpritesDrawn} sprites in {Sprites.DrawCalls} draw calls, {_scene.Count} entities, {_scene.Collision.Count} colliders");
+            Log.Info($"Last frame: {Sprites.SpritesDrawn} sprites in {Sprites.DrawCalls} draw calls, {_scene.Count} entities, " +
+                $"{_scene.Collision.Count} colliders, {_shapeTestsLastFrame} shape tests");
 
         if (Input.WasPressed(Key.F2))
             _showColliders = !_showColliders;
@@ -93,6 +96,11 @@ sealed class ShooterGame() : Game("HavingFunWithEngine - Top-Down Shooter")
         // The player aims at it in its own Update.
         _player.AimPoint = Input.MouseWorldPosition(_camera);
         _scene.Update(deltaTime);
+
+        // Everything that tests shapes this frame has run: this frame's fixed steps (moves, bullets,
+        // the shoulder-to-muzzle check) and the laser in the player's Update. F3 prints it next frame.
+        _shapeTestsLastFrame = _scene.Collision.ShapeTests;
+        _scene.Collision.ResetStats();
     }
 
     protected override void Draw()

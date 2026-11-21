@@ -22,8 +22,21 @@ public sealed class Collider(Shape shape, uint layer, uint mask = 0u, bool isTri
     private static int _nextId;
     private Vector2 _position;
 
-    /// <summary>The shape, with its <see cref="Shape.Center"/> as an offset from <see cref="Position"/>.</summary>
-    public Shape Shape { get; set; } = shape;
+    /// <summary>
+    /// The shape, with its <see cref="Shape.Center"/> as an offset from <see cref="Position"/>. A new
+    /// shape is seen by the world's queries at once.
+    /// </summary>
+    public Shape Shape
+    {
+        get => _shape;
+        set
+        {
+            _shape = value;
+            World?.Moved(this);
+        }
+    }
+
+    private Shape _shape = shape;
 
     public uint Layer { get; set; } = layer;
     public uint Mask { get; set; } = mask;
@@ -37,7 +50,9 @@ public sealed class Collider(Shape shape, uint layer, uint mask = 0u, bool isTri
 
     /// <summary>
     /// Where the collider is: its owner's <see cref="Entity.Position"/>, or its own for a collider
-    /// without an owner. Setting it on an attached collider moves the entity.
+    /// without an owner. Setting it on an attached collider moves the entity. Either way its world's
+    /// queries find it at the new place at once. Setting it is a jump; <see cref="CollisionWorld.Move"/>
+    /// is the move that stops at solid things.
     /// </summary>
     public Vector2 Position
     {
@@ -45,9 +60,14 @@ public sealed class Collider(Shape shape, uint layer, uint mask = 0u, bool isTri
         set
         {
             if (Owner is not null)
-                Owner.Position = value;
+            {
+                Owner.Position = value; // the entity tells the world
+            }
             else
+            {
                 _position = value;
+                World?.Moved(this);
+            }
         }
     }
 
@@ -62,4 +82,10 @@ public sealed class Collider(Shape shape, uint layer, uint mask = 0u, bool isTri
 
     internal int Id { get; } = Interlocked.Increment(ref _nextId);
     internal int Index = -1; // where it sits in its world's list, for removing without a search
+
+    // The world's grid bookkeeping: the range of cells it was filed under, and the last query
+    // that already collected it (so one spanning several cells is tested once).
+    internal bool InGrid;
+    internal int CellMinX, CellMinY, CellMaxX, CellMaxY;
+    internal int QueryStamp;
 }

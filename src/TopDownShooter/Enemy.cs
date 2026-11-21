@@ -3,32 +3,40 @@ using Engine;
 
 /// <summary>
 /// A first-pass enemy: an <see cref="Entity"/> that walks straight at the player at a fixed speed,
-/// whom it finds in the scene by type, and disappears when it reaches them. Its collider is a
-/// trigger that notices the player, so "reaching" is the trigger's begin event. Until damage exists,
-/// that's how it leaves the scene, which tests destroying an entity in the middle of the fixed step.
-/// It still walks through walls and other enemies: that changes in roadmap step 5 Phase B.
+/// whom it finds in the scene by type. Its collider is solid: it's stopped by walls, the crate,
+/// other enemies and the player, and slides around them. Bumping into the player shows up as a
+/// contact from its move, and then it disappears (there's no damage yet). One bullet kills it.
 /// </summary>
 sealed class Enemy : Entity
 {
     public const string TagName = "enemy";
     public const float Speed = 2f;     // world units per second (the player does 5)
     public const float Radius = 0.45f; // world units: the collider, about as wide as the shoulders
+    private const float TouchMargin = 0.01f; // world units: how close to touching still counts as reaching the player
 
     private static readonly Vector2 BodyCenterPixel = new(256f, 256f); // in enemy.png
 
     public float Angle; // radians, counter-clockwise from +X; where it faces
 
     private readonly Art _art;
+    private readonly List<Contact> _contacts = []; // filled by each move, kept so moving doesn't allocate
     private float _walkTime; // seconds into the walk animation
 
     public Enemy(Art art, Vector2 position) : base(position)
     {
         _art = art;
         Tag = TagName;
-        Collider = new Collider(Shape.Circle(Radius), CollisionLayers.Enemy, mask: CollisionLayers.Player, isTrigger: true);
+        // Solid, and stopped by walls, other enemies and the player. The player's mask doesn't include
+        // enemies, so enemies never block the player; they only block themselves against it.
+        Collider = new Collider(Shape.Circle(Radius), CollisionLayers.Enemy,
+            mask: CollisionLayers.Wall | CollisionLayers.Enemy | CollisionLayers.Player);
     }
 
-    // Simulation: walk toward where the player really is (Position, not the blended DrawPosition).
+    /// <summary>Hit by a bullet. Enemies die in one hit for now.</summary>
+    public void Kill() => Destroy();
+
+    // Simulation: walk toward where the player really is (Position, not the blended DrawPosition),
+    // sliding around whatever is in the way.
     protected override void FixedUpdate(float step)
     {
         var player = Scene!.FindFirst<Player>();
@@ -37,16 +45,27 @@ sealed class Enemy : Entity
 
         var toPlayer = player.Position - Position;
         float distance = toPlayer.Length();
-        if (distance > 1e-6f)
-            Position += toPlayer / distance * MathF.Min(Speed * step, distance); // never past the player
+        if (distance < 1e-6f)
+            return;
+        MoveAndSlide(toPlayer / distance * MathF.Min(Speed * step, distance), _contacts);
+
+        // Reached the player? Destroying in the middle of the scene's fixed step is safe (it's removed
+        // when the step ends).
+        if (TouchedPlayer(player))
+            Destroy();
     }
 
-    // The trigger touched the player: the enemy has reached them. This comes at the end of the
-    // fixed step, still inside the scene's pass, so destroying here is safe.
-    protected override void TriggerEnter(Collider other)
+    // Usually the move reports a contact with the player's collider. But each push-out round records
+    // only the deepest overlap, so when several enemies crowd the player, a deeper overlap with a
+    // neighbor can win every round, and pushing out of it can also lift this one off the player: no
+    // contact is reported though they touch. Being within touching distance after the move counts too
+    // (a push-out leaves a gap of only 0.0001 units, well inside the margin).
+    private bool TouchedPlayer(Player player)
     {
-        if (other.Owner is Player)
-            Destroy();
+        foreach (var contact in _contacts)
+            if (contact.Other?.Owner is Player)
+                return true;
+        return Vector2.Distance(player.Position, Position) <= Radius + Player.Radius + TouchMargin;
     }
 
     // Per frame: face the player as smoothly as the player is drawn, and play the walk cycle while moving.
