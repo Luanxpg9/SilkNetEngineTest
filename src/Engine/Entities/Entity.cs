@@ -33,6 +33,38 @@ public abstract class Entity
     /// <summary>The scene the entity is in, or null before it's spawned and after it's removed.</summary>
     public Scene? Scene { get; internal set; }
 
+    private Collider? _collider;
+
+    /// <summary>
+    /// The entity's collider, or null for none. It moves with the entity. The scene adds it to its
+    /// <see cref="Scene.Collision"/> world when the entity spawns and removes it when the entity is
+    /// destroyed; swapping it while the entity is in a scene swaps it in the world too.
+    /// </summary>
+    public Collider? Collider
+    {
+        get => _collider;
+        set
+        {
+            if (value == _collider)
+                return;
+            if (value is not null && (value.Owner is not null || value.World is not null))
+                throw new InvalidOperationException("This collider already belongs to an entity or a collision world.");
+
+            if (_collider is not null)
+            {
+                _collider.World?.Remove(_collider);
+                _collider.Owner = null;
+            }
+            _collider = value;
+            if (value is not null)
+            {
+                value.Owner = this;
+                if (Scene is not null && !IsDestroyed)
+                    Scene.Collision.Add(value);
+            }
+        }
+    }
+
     /// <summary>
     /// True once <see cref="Destroy"/> has been called, and for good: a destroyed entity can't be
     /// spawned again, so code holding on to one (a homing target, say) can trust it. The scene stops
@@ -59,6 +91,22 @@ public abstract class Entity
     /// <summary>Removes the entity from its scene (see <see cref="Scene.Destroy"/>).</summary>
     public void Destroy() => Scene?.Destroy(this);
 
+    /// <summary>
+    /// Moves by <paramref name="displacement"/>, stopping at solid colliders this entity's
+    /// <see cref="Collider"/> notices and sliding along them (see <see cref="CollisionWorld.Move"/>).
+    /// Returns how far it really moved, and fills <paramref name="contacts"/> if given. Without a
+    /// collider in a world, it just moves. Call it in <see cref="FixedUpdate"/>.
+    /// </summary>
+    protected Vector2 MoveAndSlide(Vector2 displacement, List<Contact>? contacts = null)
+    {
+        if (_collider?.World is { } world)
+            return world.Move(_collider, displacement, contacts);
+
+        contacts?.Clear();
+        Position += displacement;
+        return displacement;
+    }
+
     /// <summary>Simulation at a constant rate, run by <see cref="Scene.FixedUpdate"/>. Move here.</summary>
     protected internal virtual void FixedUpdate(float step) { }
 
@@ -67,4 +115,14 @@ public abstract class Entity
 
     /// <summary>Once per frame, run by <see cref="Scene.Draw"/>, between the batch's Begin and End. Draw at <see cref="DrawPosition"/>.</summary>
     protected internal virtual void Draw(SpriteBatch sprites) { }
+
+    /// <summary>
+    /// This entity's collider started overlapping <paramref name="other"/>, and one of the two is a
+    /// trigger that notices the other. Both entities of the pair are told. Called at the end of the
+    /// fixed step, after every entity has moved; destroying or spawning here is safe.
+    /// </summary>
+    protected internal virtual void TriggerEnter(Collider other) { }
+
+    /// <summary>The overlap reported by <see cref="TriggerEnter"/> has ended. Not called when one of the two is removed.</summary>
+    protected internal virtual void TriggerExit(Collider other) { }
 }

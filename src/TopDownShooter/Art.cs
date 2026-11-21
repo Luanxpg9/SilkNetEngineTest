@@ -16,6 +16,7 @@ static class Layers
     public const int Weapons = 40;  // the player's rifle, over the arms (so it can recoil on its own later)
     public const int BodyTops = 45; // helmet and gloves, over the rifle: cheek on the stock, fingers around the grip
     public const int Effects = 50;  // laser beam and tracers, later muzzle flashes
+    public const int Debug = 100;   // collider outlines (F2), over everything
 }
 
 /// <summary>

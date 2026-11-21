@@ -9,6 +9,10 @@ Everything is in the `Engine` namespace.
 | [`Game.cs`](Game.cs) | Base class for a game: window, GL context, main loop with a fixed step |
 | [`Entities/Entity.cs`](Entities/Entity.cs) | Base class for game objects: position with smooth blending between fixed steps, tag, overridable `FixedUpdate` / `Update` / `Draw` |
 | [`Entities/Scene.cs`](Entities/Scene.cs) | Owns and runs entities in spawn order; spawn and destroy safely mid-update; find by type or tag |
+| [`Collision/Shape.cs`](Collision/Shape.cs) | Collision shapes: circles and axis-aligned boxes, as an offset or placed in the world |
+| [`Collision/Intersection.cs`](Collision/Intersection.cs) | Shape against shape (overlap, contact normal and depth), point inside, raycasts; `Contact` and `RayHit` |
+| [`Collision/Collider.cs`](Collision/Collider.cs) | A shape on an entity or standing alone (walls): solid or trigger, with a layer and a mask |
+| [`Collision/CollisionWorld.cs`](Collision/CollisionWorld.cs) | A scene's colliders: overlap queries, raycasts, moving with slide, trigger events, a debug view |
 | [`Input/Input.cs`](Input/Input.cs) | Keyboard and mouse state: held, pressed and released (per frame or per fixed step), mouse position |
 | [`MathHelpers.cs`](MathHelpers.cs) | Angle and vector helpers: wrap an angle, direction from an angle, rotate a vector, frame-rate independent smoothing |
 | [`Log.cs`](Log.cs) | Console logging with three levels (info, warning, error) that can be filtered or turned off |
@@ -22,7 +26,7 @@ Everything is in the `Engine` namespace.
 | [`Rect.cs`](Rect.cs) | Axis-aligned rectangle: center and size only, for layout, hit testing and drawing |
 | [`Color.cs`](Color.cs) | RGBA color (0..1 per channel), with ready-made colors and hex codes like `#2B2D35` |
 
-The rigid-body box physics used to live here. It moved to [`src/Sandbox`](../Sandbox) in step 2.5, because games like the shooter don't use it; step 5 brings the engine's own 2D collision.
+The rigid-body box physics used to live here. It moved to [`src/Sandbox`](../Sandbox) in step 2.5, because games like the shooter don't use it; step 5 brought the engine's own 2D collision (see "Collision" below).
 
 Silk.NET packages (`Input`, `OpenGL`, `Windowing`, all 2.23.0) and `StbImageSharp` (image loading) are referenced here, and projects that reference the engine get them too.
 
@@ -137,6 +141,32 @@ _scene.Draw(Sprites);
 
 Move in `FixedUpdate` and draw at `DrawPosition`, and motion is smooth on any screen (see 10 below). `Teleport(to)` jumps without blending. `Destroy()` (or `scene.Destroy(entity)`) removes an entity; `scene.Spawn(entity)` adds one and returns it, so `var b = scene.Spawn(new Bullet(...))` works. Both are safe in the middle of an update. A destroyed entity stays destroyed (`IsDestroyed`) and can't be spawned again, so a reference to it never comes back to life; spawn a new one instead. `FindFirst<T>()` and `FindAll<T>(list)` find by type, `FindFirstWithTag(tag)` and `FindAllWithTag(tag, list)` by the optional `Tag`. The `FindAll` versions fill a list you pass in, so keep one between frames and finding doesn't allocate. Inside an entity, `Game` is the scene's game (for `Input`), and `Scene` is the scene.
 
+### Collision
+
+Collision for any 2D game: it knows nothing about gravity or which way is up, so a top-down game and a platformer use the same calls. It's collision only, not physics: nothing moves unless the game moves it.
+
+Name your layers as bits, give entities a `Collider`, and add colliders that aren't entities (walls) to the scene's world:
+
+```csharp
+static class CollisionLayers { public const uint Player = 1 << 0, Wall = 1 << 1; }
+
+// in the player's constructor: solid, stopped by walls
+Collider = new Collider(Shape.Circle(0.45f), CollisionLayers.Player, mask: CollisionLayers.Wall);
+
+// in the player's FixedUpdate: move, stopping at walls and sliding along them
+MoveAndSlide(direction * Speed * step);
+
+// in the game's Load: a wall standing on its own
+_scene.Collision.Add(new Collider(Shape.Box(wallRect), CollisionLayers.Wall));
+```
+
+- **Layer and mask.** A collider's `Layer` says what it is, its `Mask` what it notices. One-way: the player above notices walls, the walls (mask 0) notice nothing.
+- **Moving.** `MoveAndSlide(displacement, contacts)` (or `Collision.Move(collider, ...)`) returns how far the entity really moved, and fills `contacts` with one `Contact` per collider touched. Each contact's `Normal` points away from what was hit, so a platformer finds the ground as a contact with `Normal.Y > 0.7`, and a top-down game can ignore normals.
+- **Triggers.** `isTrigger: true` makes a collider that never blocks. When it starts or stops overlapping something its mask notices, both entities get `TriggerEnter(other)` or `TriggerExit(other)`, at the end of the fixed step. Destroying or spawning there is safe.
+- **Queries.** `Collision.OverlapPoint(point, mask, list)`, `Collision.OverlapShape(Shape.Circle(2f, center: at), mask, list)` and `Collision.Raycast(origin, direction, maxDistance, mask, out RayHit hit)`. Triggers are skipped unless `includeTriggers: true`. A raycast can `ignore` one collider, usually the caster's own.
+- **Debug view.** `Collision.DrawDebug(Sprites, thickness, layer)` draws every outline: green for entities' solid colliders, yellow for triggers, blue for colliders without an entity.
+- **Bare shapes.** `Intersection.Overlap(a, b, out contact)`, `Intersection.Contains(shape, point)` and `Intersection.Raycast(...)` test two shapes placed in the world (`shape.At(position)`), with no world involved.
+
 ### Logging
 
 `Log.Info`, `Log.Warning` and `Log.Error` write to the console as `[INFO ]`, `[WARN ]` (yellow) and `[ERROR]` (red, on the error stream). `Log.Level` hides everything below it, and `LogLevel.None` turns logging off. Set it before `Run()`:
@@ -202,6 +232,16 @@ The default is `LogLevel.Info`, so everything shows. An interpolated message (`$
     - **Order.** Entities run in spawn order. Drawing order is decided by sprite layers, not by the list.
     - **Finding.** A straight walk over the list, testing `is T` or the tag. That's plenty for dozens of entities; an index by type can come later if a profile asks for it.
     - **No allocations while running.** The lists only grow when they reach a new largest size, the removal predicate is a `static` lambda (created once), and the finds fill a list the caller keeps.
+
+11. **Collision (`Shape`, `Intersection`, `Collider`, `CollisionWorld`).**
+    - **Shapes.** A `Shape` is a circle or an axis-aligned box: a kind, a center and half its size. On a collider the center is an offset from the collider's position; `At(position)` places it in the world.
+    - **Overlap tests.** Each returns a `Contact` that pushes the first shape out of the second: a unit normal and a depth. Circle-circle: along the line between the centers. Box-box: along the axis with the smaller overlap, the shortest way out. Circle-box: away from the box's point closest to the circle's center (the center clamped into the box). Near a corner that pushes away from the corner, which is what lets a circle slide smoothly around it; a center inside the box goes out through the nearest face. Shapes that only touch don't overlap.
+    - **Raycasts.** Circle: solve `|origin + t·direction − center| = radius` for the smaller `t`. Box: the slab method: on each axis, where the ray enters and leaves the box's span; it hits if the latest entry comes before the earliest exit, and the axis of the latest entry is the face hit. A ray that starts inside a shape hits it at distance 0.
+    - **Colliders.** An attached collider reads its position from its entity, so it moves with it for free. The scene adds an entity's collider to the world when the entity spawns and removes it when the destroyed entity leaves; meanwhile every query and move skips colliders of destroyed entities. The world keeps a plain list, and each collider remembers its index in it, so removing swaps the last one into its place instead of searching.
+    - **Move and slide.** The move is cut into substeps no longer than the shape's smaller half-size (at most 16), so a fast body can't jump past a wall between two tests. After each substep, the shape is pushed out of the deepest overlapping solid it notices, along the contact normal and a hair (0.0001 units) more, up to 4 times so it settles into corners. Pushing straight out removes only the part of the move that went into the wall; the part along it stays, and that's the slide. Each collider touched is reported once, with the first contact found against it.
+    - **Triggers.** At the end of each fixed step, after all entities have moved, the scene asks the world for every pair where one is a trigger that notices the other, and keeps the overlapping ones in a dictionary keyed by the pair's ids. Pairs not in last step's dictionary began; pairs in it but not in this one ended (unless one of them left the game). The events go out after the bookkeeping, still inside the scene's pass, so entities can destroy themselves in them. Two dictionaries swap every step, so nothing allocates once they've grown.
+    - **Cost.** Every query, move and trigger update tests every collider. That's fine for a few dozen; a uniform grid that only tests nearby colliders comes in step 5 Phase B.
+    - **Debug view.** Circles are drawn as 32 short lines and boxes as 4, with `DrawLine`. Entities' colliders are drawn at the entity's `DrawPosition`, the same blended position as the sprite, so the outline doesn't trail behind it while moving.
 
 > **Screen to world.** Mouse positions arrive in window pixels with y pointing down. `Camera2D.ScreenToWorld` turns them into normalized device coordinates (-1..1, y up), scales by half the visible size and adds the camera position. That's the inverse of the camera's matrices, worked out by hand because an orthographic camera makes it simple.
 
